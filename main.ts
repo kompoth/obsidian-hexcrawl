@@ -26,15 +26,8 @@ export default class HexcrawlPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const builtinIconsFolder = this.manifest.dir
-			? `${this.manifest.dir}/icons`
-			: undefined;
 		const data = (await this.loadData()) as Partial<HexcrawlSettings> | null;
-		this.settings = Object.assign(
-			{},
-			getDefaultSettings(builtinIconsFolder),
-			data,
-		);
+		this.settings = Object.assign({}, getDefaultSettings(), data);
 	}
 
 	async saveSettings(): Promise<void> {
