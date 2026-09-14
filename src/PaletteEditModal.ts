@@ -16,6 +16,9 @@ const DASH_OPTIONS: PathDashStyle[] = ["solid", "dashed", "dotted"];
  *  entry is edited in its own nested modal (TerrainEntryModal/PathEntryModal below). */
 export class PaletteEditModal extends Modal {
 	private pendingName: string;
+	/** Bumped on every renderTerrainList() call so a stale async call (e.g. from the debounced
+	 *  icons-folder reload racing a delete/rename) can detect it's no longer current. */
+	private terrainRenderId = 0;
 
 	constructor(
 		app: App,
@@ -127,10 +130,12 @@ export class PaletteEditModal extends Modal {
 
 	private async renderTerrainList(el: HTMLElement): Promise<void> {
 		el.empty();
+		const renderId = ++this.terrainRenderId;
 		const palette = this.palette;
 		const iconSrcs = palette.iconsFolder
 			? await loadIcons(this.app, palette.iconsFolder)
 			: new Map<string, string>();
+		if (renderId !== this.terrainRenderId) return;
 
 		for (const key of Object.keys(palette.terrain)) {
 			const entry = palette.terrain[key];

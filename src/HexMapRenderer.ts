@@ -219,27 +219,35 @@ export class HexMapRenderer {
 	private async runTool(
 		q: number,
 		r: number,
-		activeTool: ToolKind,
+		activeTool: Exclude<ToolKind, "path">,
 		selection: DrawerSelection | null,
 	): Promise<void> {
 		if (!selection) return;
 
-		if (activeTool === "brush") {
-			await this.writeHexField(
-				q,
-				r,
-				"hex-terrain",
-				selection.erase ? undefined : selection.value,
-			);
-		} else if (activeTool === "icon") {
-			await this.writeHexField(
-				q,
-				r,
-				"hex-icon",
-				selection.erase ? undefined : selection.value,
-			);
-		} else if (activeTool === "bucket" && !selection.erase) {
-			await this.bucketFill(q, r, selection.value);
+		switch (activeTool) {
+			case "brush":
+				await this.writeHexField(
+					q,
+					r,
+					"hex-terrain",
+					selection.erase ? undefined : selection.value,
+				);
+				break;
+			case "icon":
+				await this.writeHexField(
+					q,
+					r,
+					"hex-icon",
+					selection.erase ? undefined : selection.value,
+				);
+				break;
+			case "bucket":
+				if (!selection.erase) await this.bucketFill(q, r, selection.value);
+				break;
+			case "layers":
+				break; // Layers tool has no per-hex click effect.
+			default:
+				activeTool satisfies never;
 		}
 	}
 

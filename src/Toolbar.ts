@@ -108,6 +108,9 @@ export class Toolbar {
 	private _activeTool: ToolKind | null = null;
 	private _drawerSelection: DrawerSelection | null = null;
 	private scrollEl: HTMLElement | null = null;
+	/** Bumped on every populateDrawer() call so a stale async populate (from a tool switch
+	 *  mid-flight) can detect it's no longer current and skip rendering into the drawer. */
+	private drawerRenderId = 0;
 
 	constructor(
 		private app: App,
@@ -180,14 +183,15 @@ export class Toolbar {
 
 	private populateDrawer(scrollEl: HTMLElement, kind: ToolKind): void {
 		scrollEl.empty();
+		const renderId = ++this.drawerRenderId;
 		if (kind === "brush" || kind === "icon") this.addEraserItem(scrollEl);
 		switch (kind) {
 			case "brush":
 			case "bucket":
-				void this.populateTerrainDrawer(scrollEl);
+				void this.populateTerrainDrawer(scrollEl, renderId);
 				break;
 			case "icon":
-				void this.populateIconDrawer(scrollEl);
+				void this.populateIconDrawer(scrollEl, renderId);
 				break;
 			case "path":
 				this.hooks.populatePathDrawer(scrollEl);
@@ -205,7 +209,10 @@ export class Toolbar {
 		setIcon(previewEl, "eraser");
 	}
 
-	private async populateTerrainDrawer(scrollEl: HTMLElement): Promise<void> {
+	private async populateTerrainDrawer(
+		scrollEl: HTMLElement,
+		renderId: number,
+	): Promise<void> {
 		const terrain = this.params.palette?.terrain ?? {};
 		const names = Object.keys(terrain).sort();
 		if (names.length === 0) {
@@ -216,6 +223,7 @@ export class Toolbar {
 		const iconSrcs = iconsFolder
 			? await loadIcons(this.app, iconsFolder)
 			: undefined;
+		if (renderId !== this.drawerRenderId) return;
 		for (const name of names) {
 			const entry = terrain[name];
 			const { previewEl } = createDrawerItem(scrollEl, name, () => {
@@ -229,13 +237,17 @@ export class Toolbar {
 		}
 	}
 
-	private async populateIconDrawer(scrollEl: HTMLElement): Promise<void> {
+	private async populateIconDrawer(
+		scrollEl: HTMLElement,
+		renderId: number,
+	): Promise<void> {
 		const iconsFolder = resolveIconsFolder(this.params);
 		if (!iconsFolder) {
 			renderDrawerEmpty(scrollEl, "No icons folder configured");
 			return;
 		}
 		const iconSrcs = await loadIcons(this.app, iconsFolder);
+		if (renderId !== this.drawerRenderId) return;
 		const sortedIcons = [...iconSrcs].sort(([a], [b]) => a.localeCompare(b));
 		if (sortedIcons.length === 0) {
 			renderDrawerEmpty(scrollEl, "No icons found");
