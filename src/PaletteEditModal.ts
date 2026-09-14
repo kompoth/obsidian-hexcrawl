@@ -1,6 +1,7 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import { App, debounce, Modal, Notice, Setting } from "obsidian";
 import type HexcrawlPlugin from "../main";
 import { loadIcons } from "./dataLoaders";
+import { applyPathPreviewStyle, DEFAULT_PATH_WIDTH } from "./PathTool";
 import { renameKey, uniqueKey } from "./pure";
 import type {
 	Palette,
@@ -10,7 +11,6 @@ import type {
 } from "./types";
 
 const DASH_OPTIONS: PathDashStyle[] = ["solid", "dashed", "dotted"];
-const DEFAULT_PATH_WIDTH = 3;
 
 /** Edits one palette's name/icons-folder, plus a plain list of its terrain/path entries — each
  *  entry is edited in its own nested modal (TerrainEntryModal/PathEntryModal below). */
@@ -67,6 +67,10 @@ export class PaletteEditModal extends Modal {
 				text.setValue(this.name).onChange((v) => (this.pendingName = v)),
 			);
 
+		const reloadTerrainIcons = debounce(
+			() => void this.renderTerrainList(terrainListEl),
+			300,
+		);
 		new Setting(contentEl)
 			.setName("Icons folder")
 			.setDesc("Vault-relative folder icon names below are looked up in.")
@@ -77,7 +81,7 @@ export class PaletteEditModal extends Modal {
 					.onChange((v) => {
 						palette.iconsFolder = v.trim() || undefined;
 						void this.plugin.saveSettings();
-						void this.renderTerrainList(terrainListEl);
+						reloadTerrainIcons();
 					}),
 			);
 
@@ -177,12 +181,7 @@ export class PaletteEditModal extends Modal {
 			const previewEl = row.controlEl.createDiv({
 				cls: "hexcrawl-settings-path-preview",
 			});
-			previewEl.style.borderTopColor = entry.color ?? "var(--text-muted)";
-			previewEl.style.borderTopWidth = `${Math.min(Math.max(entry.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-			previewEl.style.borderTopStyle =
-				entry.dash === "dotted" || entry.dash === "dashed"
-					? entry.dash
-					: "solid";
+			applyPathPreviewStyle(previewEl, entry);
 			row.addExtraButton((btn) =>
 				btn
 					.setIcon("pencil")
@@ -373,14 +372,7 @@ class PathEntryModal extends PaletteEntryModal<PathStyleEntry> {
 		const previewEl = contentEl.createDiv({
 			cls: "hexcrawl-settings-path-preview",
 		});
-		const updatePreview = () => {
-			previewEl.style.borderTopColor = entry.color ?? "var(--text-muted)";
-			previewEl.style.borderTopWidth = `${Math.min(Math.max(entry.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-			previewEl.style.borderTopStyle =
-				entry.dash === "dotted" || entry.dash === "dashed"
-					? entry.dash
-					: "solid";
-		};
+		const updatePreview = () => applyPathPreviewStyle(previewEl, entry);
 		updatePreview();
 
 		new Setting(contentEl)

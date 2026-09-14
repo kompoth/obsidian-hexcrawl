@@ -13,6 +13,11 @@ export interface Pt {
 	cy: number;
 }
 
+/** Map key for a hex coordinate, shared by every layer/renderer keying off (q, r). */
+export function hexKey(q: number, r: number): string {
+	return `${q},${r}`;
+}
+
 /**
  * (width, height) of a single hex of the given radius and orientation.
  * Radius = distance from hex center to any vertex.

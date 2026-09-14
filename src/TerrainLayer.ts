@@ -1,6 +1,6 @@
 import { setTooltip } from "obsidian";
 import type { HexcrawlBlockParams, HexNoteData } from "./types";
-import { hexCenter, hexSize } from "./hexGeometry";
+import { hexCenter, hexKey, hexSize } from "./hexGeometry";
 import { resolvePaletteEntry } from "./pure";
 
 /** The hex grid's terrain-color layer — its cells double as the click hit-targets used by tool
@@ -33,7 +33,7 @@ export class TerrainLayer {
 
 		for (let r = 0; r < rows; r++) {
 			for (let q = 0; q < cols; q++) {
-				const key = `${q},${r}`;
+				const key = hexKey(q, r);
 				const center = hexCenter(q, r, orientation, radius, stagger);
 				const note = hexNotes.get(key);
 
@@ -64,7 +64,7 @@ export class TerrainLayer {
 
 	/** Re-derives one hex's color/tooltip/clickability from its current note data. */
 	updateHex(q: number, r: number, note: HexNoteData): void {
-		const key = `${q},${r}`;
+		const key = hexKey(q, r);
 		const hexEl = this.hexElements.get(key);
 		if (!hexEl) return;
 

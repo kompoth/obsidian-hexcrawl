@@ -6,7 +6,12 @@ import {
 	TFolder,
 } from "obsidian";
 import type { HexCoord, HexcrawlBlockParams, HexNoteData } from "./types";
-import { gridBoundingBox, hexCenter, hexNeighbors } from "./hexGeometry";
+import {
+	gridBoundingBox,
+	hexCenter,
+	hexKey,
+	hexNeighbors,
+} from "./hexGeometry";
 import { loadHexNotes } from "./dataLoaders";
 import { resolveIconsFolder } from "./pure";
 import { setupPanAndZoom } from "./PanZoom";
@@ -241,7 +246,7 @@ export class HexMapRenderer {
 	/** Flood-fills the contiguous region of hexes sharing the clicked hex's current hex-terrain. */
 	private async bucketFill(q: number, r: number, value: string): Promise<void> {
 		const { cols, rows, orientation, stagger } = this.params;
-		const startTerrain = this.hexNotes.get(`${q},${r}`)?.terrain;
+		const startTerrain = this.hexNotes.get(hexKey(q, r))?.terrain;
 
 		const visited = new Set<string>();
 		const stack: HexCoord[] = [{ q, r }];
@@ -250,13 +255,13 @@ export class HexMapRenderer {
 		while (stack.length > 0) {
 			const cur = stack.pop()!;
 			if (cur.q < 0 || cur.q >= cols || cur.r < 0 || cur.r >= rows) continue;
-			const key = `${cur.q},${cur.r}`;
+			const key = hexKey(cur.q, cur.r);
 			if (visited.has(key)) continue;
 			visited.add(key);
 			if (this.hexNotes.get(key)?.terrain !== startTerrain) continue;
 			region.push(cur);
 			for (const n of hexNeighbors(cur.q, cur.r, orientation, stagger)) {
-				if (!visited.has(`${n.q},${n.r}`)) stack.push(n);
+				if (!visited.has(hexKey(n.q, n.r))) stack.push(n);
 			}
 		}
 
@@ -280,7 +285,7 @@ export class HexMapRenderer {
 		field: "hex-terrain" | "hex-icon",
 		value: string | undefined,
 	): Promise<void> {
-		const key = `${q},${r}`;
+		const key = hexKey(q, r);
 		const existing = this.hexNotes.get(key);
 		const patch = (base: { terrain?: string; icon?: string }) => ({
 			terrain: field === "hex-terrain" ? value : base.terrain,

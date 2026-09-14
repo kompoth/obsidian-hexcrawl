@@ -1,11 +1,29 @@
 import { App, normalizePath, Notice, setIcon, TFile, TFolder } from "obsidian";
-import type { HexCoord, HexcrawlBlockParams, Palette, PathData } from "./types";
+import type {
+	HexCoord,
+	HexcrawlBlockParams,
+	Palette,
+	PathData,
+	PathStyleEntry,
+} from "./types";
 import { hexCenter, sharpPath, smoothPath } from "./hexGeometry";
 import { createDrawerItem, renderDrawerEmpty } from "./Toolbar";
 import { dashArray, parsePathFrontmatter, uniqueFileName } from "./pure";
 
-const DEFAULT_PATH_WIDTH = 3;
+export const DEFAULT_PATH_WIDTH = 3;
 const MIN_HITAREA_WIDTH = 14;
+
+/** Renders a path type's color/width/dash onto a preview swatch's top border — shared by the
+ *  Path tool's drawer and the palette settings' terrain/path-type previews. */
+export function applyPathPreviewStyle(
+	el: HTMLElement,
+	style: PathStyleEntry,
+): void {
+	el.style.borderTopColor = style.color ?? "var(--text-muted)";
+	el.style.borderTopWidth = `${Math.min(Math.max(style.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
+	el.style.borderTopStyle =
+		style.dash === "dotted" || style.dash === "dashed" ? style.dash : "solid";
+}
 
 export function loadPaths(app: App, folder: TFolder): PathData[] {
 	const paths: PathData[] = [];
@@ -49,10 +67,7 @@ function renderPathTypeItem(
 ): void {
 	const { previewEl } = createDrawerItem(scrollEl, name, onSelect);
 	const lineEl = previewEl.createDiv({ cls: "hexcrawl-drawer-path-line" });
-	lineEl.style.borderTopColor = style.color ?? "var(--text-muted)";
-	lineEl.style.borderTopWidth = `${Math.min(Math.max(style.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-	lineEl.style.borderTopStyle =
-		style.dash === "dotted" || style.dash === "dashed" ? style.dash : "solid";
+	applyPathPreviewStyle(lineEl, style);
 }
 
 /** Owns the paths list, their SVG rendering, and the Path tool's own drawer/click state machine. */

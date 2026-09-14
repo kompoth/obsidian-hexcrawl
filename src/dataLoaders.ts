@@ -1,5 +1,6 @@
 import { App, normalizePath, TFile, TFolder } from "obsidian";
 import type { HexNoteData } from "./types";
+import { hexKey } from "./hexGeometry";
 import { parseHexNoteFrontmatter } from "./pure";
 
 const ICON_EXTENSIONS = new Set(["svg", "png", "jpg", "jpeg", "gif", "webp"]);
@@ -15,7 +16,7 @@ export function loadHexNotes(
 		if (!frontmatter) continue;
 		const parsed = parseHexNoteFrontmatter(frontmatter);
 		if (!parsed) continue;
-		notes.set(`${parsed.q},${parsed.r}`, {
+		notes.set(hexKey(parsed.q, parsed.r), {
 			path: child.path,
 			name: child.basename,
 			terrain: parsed.terrain,

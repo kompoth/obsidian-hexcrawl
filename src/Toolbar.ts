@@ -222,8 +222,10 @@ export class Toolbar {
 				this._drawerSelection = { erase: false, value: name };
 			});
 			if (entry.color) previewEl.style.backgroundColor = entry.color;
-			const iconSrc = entry.icon ? iconSrcs?.get(entry.icon) : undefined;
-			if (iconSrc) addDrawerPreviewImage(previewEl, iconSrc, entry.icon!);
+			if (entry.icon) {
+				const iconSrc = iconSrcs?.get(entry.icon);
+				if (iconSrc) addDrawerPreviewImage(previewEl, iconSrc, entry.icon);
+			}
 		}
 	}
 
@@ -234,16 +236,16 @@ export class Toolbar {
 			return;
 		}
 		const iconSrcs = await loadIcons(this.app, iconsFolder);
-		const names = [...iconSrcs.keys()].sort();
-		if (names.length === 0) {
+		const sortedIcons = [...iconSrcs].sort(([a], [b]) => a.localeCompare(b));
+		if (sortedIcons.length === 0) {
 			renderDrawerEmpty(scrollEl, "No icons found");
 			return;
 		}
-		for (const name of names) {
+		for (const [name, src] of sortedIcons) {
 			const { previewEl } = createDrawerItem(scrollEl, name, () => {
 				this._drawerSelection = { erase: false, value: name };
 			});
-			addDrawerPreviewImage(previewEl, iconSrcs.get(name)!, name);
+			addDrawerPreviewImage(previewEl, src, name);
 		}
 	}
 }
