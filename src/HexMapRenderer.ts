@@ -282,6 +282,10 @@ export class HexMapRenderer {
 	): Promise<void> {
 		const key = `${q},${r}`;
 		const existing = this.hexNotes.get(key);
+		const patch = (base: { terrain?: string; icon?: string }) => ({
+			terrain: field === "hex-terrain" ? value : base.terrain,
+			icon: field === "hex-icon" ? value : base.icon,
+		});
 
 		if (existing) {
 			const file = this.app.vault.getAbstractFileByPath(existing.path);
@@ -293,11 +297,7 @@ export class HexMapRenderer {
 					else fm[field] = value;
 				},
 			);
-			const updated: HexNoteData = {
-				...existing,
-				terrain: field === "hex-terrain" ? value : existing.terrain,
-				icon: field === "hex-icon" ? value : existing.icon,
-			};
+			const updated: HexNoteData = { ...existing, ...patch(existing) };
 			this.hexNotes.set(key, updated);
 			this.terrainLayer.updateHex(q, r, updated);
 			this.iconsLayer.updateHex(q, r, updated);
@@ -312,8 +312,7 @@ export class HexMapRenderer {
 		const created: HexNoteData = {
 			path: file.path,
 			name: file.basename,
-			terrain: field === "hex-terrain" ? value : undefined,
-			icon: field === "hex-icon" ? value : undefined,
+			...patch({}),
 		};
 		this.hexNotes.set(key, created);
 		this.terrainLayer.updateHex(q, r, created);

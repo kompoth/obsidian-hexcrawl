@@ -68,13 +68,14 @@ export class IconsLayer {
 			for (let q = 0; q < cols; q++) {
 				const note = hexNotes.get(`${q},${r}`);
 				const iconName = note?.icon ?? resolvePaletteEntry(note, palette)?.icon;
-				const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
+				if (!iconName) continue;
+				const iconSrc = this.iconSrcs?.get(iconName);
 				if (!iconSrc) continue;
 				const center = hexCenter(q, r, orientation, radius, stagger);
 				this.placeIcon(
 					`${q},${r}`,
 					iconSrc,
-					iconName!,
+					iconName,
 					gutter + center.cx,
 					gutter + center.cy,
 					hexW,
@@ -93,13 +94,13 @@ export class IconsLayer {
 		const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
 		const iconEl = this.iconElements.get(key);
 
-		if (iconSrc) {
+		if (iconName && iconSrc) {
 			const center = hexCenter(q, r, orientation, radius, stagger);
 			const { w: hexW, h: hexH } = hexSize(radius, orientation);
 			this.placeIcon(
 				key,
 				iconSrc,
-				iconName!,
+				iconName,
 				this.gutter + center.cx,
 				this.gutter + center.cy,
 				hexW,

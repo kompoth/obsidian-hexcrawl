@@ -2,7 +2,12 @@ import { App, Modal, Notice, Setting } from "obsidian";
 import type HexcrawlPlugin from "../main";
 import { loadIcons } from "./dataLoaders";
 import { renameKey, uniqueKey } from "./pure";
-import type { Palette, PathDashStyle } from "./types";
+import type {
+	Palette,
+	PathDashStyle,
+	PathStyleEntry,
+	TerrainPaletteEntry,
+} from "./types";
 
 const DASH_OPTIONS: PathDashStyle[] = ["solid", "dashed", "dotted"];
 const DEFAULT_PATH_WIDTH = 3;
@@ -202,28 +207,35 @@ export class PaletteEditModal extends Modal {
 	}
 }
 
-/** Edits one terrain entry's name/color/icon, with a live preview. */
-class TerrainEntryModal extends Modal {
-	private pendingKey: string;
+/** Shared shape for TerrainEntryModal/PathEntryModal: a nested modal editing one named entry
+ *  in one of a palette's dictionaries, renaming it (with collision checks) on close. */
+abstract class PaletteEntryModal<T> extends Modal {
+	protected pendingKey: string;
 
 	constructor(
 		app: App,
-		private plugin: HexcrawlPlugin,
-		private paletteName: string,
-		private key: string,
+		protected plugin: HexcrawlPlugin,
+		protected paletteName: string,
+		protected key: string,
 		private onDone: () => void,
 	) {
 		super(app);
 		this.pendingKey = key;
 	}
 
-	private get palette(): Palette {
+	protected get palette(): Palette {
 		return this.plugin.settings.palettes[this.paletteName];
 	}
 
+	/** The palette dictionary this entry lives in, e.g. `palette.terrain`. */
+	protected abstract entries(palette: Palette): Record<string, T>;
+	/** Singular noun for the "already exists" notice, e.g. "terrain". */
+	protected abstract readonly noun: string;
+
+	protected abstract renderFields(): void | Promise<void>;
+
 	onOpen(): void {
-		this.setTitle("Edit terrain");
-		void this.render();
+		void this.renderFields();
 	}
 
 	onClose(): void {
@@ -235,17 +247,50 @@ class TerrainEntryModal extends Modal {
 	private commitRename(): void {
 		const next = this.pendingKey.trim();
 		if (!next || next === this.key) return;
-		const palette = this.palette;
-		if (palette.terrain[next]) {
-			new Notice(`A terrain named "${next}" already exists.`);
+		const entries = this.entries(this.palette);
+		if (entries[next]) {
+			new Notice(`A ${this.noun} named "${next}" already exists.`);
 			return;
 		}
-		renameKey(palette.terrain, this.key, next);
+		renameKey(entries, this.key, next);
 		this.key = next;
 		void this.plugin.saveSettings();
 	}
 
-	private async render(): Promise<void> {
+	/** Delete (destructive) + Done button pair shared by both entry modals' field lists. */
+	protected addDeleteDoneButtons(
+		contentEl: HTMLElement,
+		onDelete: () => void,
+	): void {
+		new Setting(contentEl)
+			.addButton((btn) => {
+				btn.buttonEl.addClass("mod-warning");
+				btn.setButtonText("Delete").onClick(() => {
+					onDelete();
+					void this.plugin.saveSettings();
+					this.pendingKey = this.key;
+					this.close();
+				});
+			})
+			.addButton((btn) =>
+				btn
+					.setButtonText("Done")
+					.setCta()
+					.onClick(() => this.close()),
+			);
+	}
+}
+
+/** Edits one terrain entry's name/color/icon, with a live preview. */
+class TerrainEntryModal extends PaletteEntryModal<TerrainPaletteEntry> {
+	protected noun = "terrain";
+
+	protected entries(palette: Palette): Record<string, TerrainPaletteEntry> {
+		return palette.terrain;
+	}
+
+	protected async renderFields(): Promise<void> {
+		this.setTitle("Edit terrain");
 		const { contentEl } = this;
 		contentEl.empty();
 		const palette = this.palette;
@@ -303,69 +348,23 @@ class TerrainEntryModal extends Modal {
 				});
 			});
 
-		new Setting(contentEl)
-			.addButton((btn) => {
-				btn.buttonEl.addClass("mod-warning");
-				btn.setButtonText("Delete").onClick(() => {
-					delete palette.terrain[this.key];
-					void this.plugin.saveSettings();
-					this.pendingKey = this.key;
-					this.close();
-				});
-			})
-			.addButton((btn) =>
-				btn
-					.setButtonText("Done")
-					.setCta()
-					.onClick(() => this.close()),
-			);
+		this.addDeleteDoneButtons(
+			contentEl,
+			() => delete palette.terrain[this.key],
+		);
 	}
 }
 
 /** Edits one path type's name/color/width/dash/spline, with a live line preview. */
-class PathEntryModal extends Modal {
-	private pendingKey: string;
+class PathEntryModal extends PaletteEntryModal<PathStyleEntry> {
+	protected noun = "path type";
 
-	constructor(
-		app: App,
-		private plugin: HexcrawlPlugin,
-		private paletteName: string,
-		private key: string,
-		private onDone: () => void,
-	) {
-		super(app);
-		this.pendingKey = key;
+	protected entries(palette: Palette): Record<string, PathStyleEntry> {
+		return palette.paths;
 	}
 
-	private get palette(): Palette {
-		return this.plugin.settings.palettes[this.paletteName];
-	}
-
-	onOpen(): void {
+	protected renderFields(): void {
 		this.setTitle("Edit path type");
-		this.render();
-	}
-
-	onClose(): void {
-		this.commitRename();
-		this.contentEl.empty();
-		this.onDone();
-	}
-
-	private commitRename(): void {
-		const next = this.pendingKey.trim();
-		if (!next || next === this.key) return;
-		const palette = this.palette;
-		if (palette.paths[next]) {
-			new Notice(`A path type named "${next}" already exists.`);
-			return;
-		}
-		renameKey(palette.paths, this.key, next);
-		this.key = next;
-		void this.plugin.saveSettings();
-	}
-
-	private render(): void {
 		const { contentEl } = this;
 		contentEl.empty();
 		const palette = this.palette;
@@ -416,7 +415,7 @@ class PathEntryModal extends Modal {
 			dropdown.addOption("", "default");
 			for (const opt of DASH_OPTIONS) dropdown.addOption(opt, opt);
 			dropdown.setValue(entry.dash ?? "").onChange((v) => {
-				entry.dash = (v || undefined) as PathDashStyle | undefined;
+				entry.dash = DASH_OPTIONS.find((opt) => opt === v);
 				updatePreview();
 				void this.plugin.saveSettings();
 			});
@@ -432,21 +431,6 @@ class PathEntryModal extends Modal {
 				}),
 			);
 
-		new Setting(contentEl)
-			.addButton((btn) => {
-				btn.buttonEl.addClass("mod-warning");
-				btn.setButtonText("Delete").onClick(() => {
-					delete palette.paths[this.key];
-					void this.plugin.saveSettings();
-					this.pendingKey = this.key;
-					this.close();
-				});
-			})
-			.addButton((btn) =>
-				btn
-					.setButtonText("Done")
-					.setCta()
-					.onClick(() => this.close()),
-			);
+		this.addDeleteDoneButtons(contentEl, () => delete palette.paths[this.key]);
 	}
 }
