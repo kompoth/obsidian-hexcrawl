@@ -26,6 +26,9 @@ const MIN_GUTTER = 20;
 export class HexMapRenderer {
 	private folder: TFolder | null = null;
 	private hexNotes = new Map<string, HexNoteData>();
+	/** Hex keys with a note-creation currently in flight, so a double-click on the same
+	 *  unconfigured hex can't race two vault.create() calls onto the same new file path. */
+	private pendingCreates = new Set<string>();
 
 	private toolbar: Toolbar;
 	private pathTool: PathTool;
@@ -318,17 +321,22 @@ export class HexMapRenderer {
 		}
 
 		if (value === undefined || !this.folder) return;
-
-		const path = normalizePath(`${this.folder.path}/_r${r}_q${q}.md`);
-		const content = `---\nhex-q: ${q}\nhex-r: ${r}\n${field}: ${JSON.stringify(value)}\n---\n`;
-		const file = await this.app.vault.create(path, content);
-		const created: HexNoteData = {
-			path: file.path,
-			name: file.basename,
-			...patch({}),
-		};
-		this.hexNotes.set(key, created);
-		this.terrainLayer.updateHex(q, r, created);
-		this.iconsLayer.updateHex(q, r, created);
+		if (this.pendingCreates.has(key)) return;
+		this.pendingCreates.add(key);
+		try {
+			const path = normalizePath(`${this.folder.path}/_r${r}_q${q}.md`);
+			const content = `---\nhex-q: ${q}\nhex-r: ${r}\n${field}: ${JSON.stringify(value)}\n---\n`;
+			const file = await this.app.vault.create(path, content);
+			const created: HexNoteData = {
+				path: file.path,
+				name: file.basename,
+				...patch({}),
+			};
+			this.hexNotes.set(key, created);
+			this.terrainLayer.updateHex(q, r, created);
+			this.iconsLayer.updateHex(q, r, created);
+		} finally {
+			this.pendingCreates.delete(key);
+		}
 	}
 }

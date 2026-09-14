@@ -43,23 +43,27 @@ export async function loadIcons(
 	} catch {
 		return icons;
 	}
-	for (const path of listed.files) {
+	const iconFiles = listed.files.flatMap((path) => {
 		const filename = path.slice(path.lastIndexOf("/") + 1);
 		const dot = filename.lastIndexOf(".");
-		if (dot <= 0) continue;
+		if (dot <= 0) return [];
 		const basename = filename.slice(0, dot);
 		const extension = filename.slice(dot + 1).toLowerCase();
-		if (!ICON_EXTENSIONS.has(extension)) continue;
+		return ICON_EXTENSIONS.has(extension) ? [{ path, basename }] : [];
+	});
 
-		// getResourcePath() alone returns a bare, stable URL for an adapter path (unlike the
-		// TFile overload, which appends the file's mtime itself) — append it here so editing an
-		// icon's contents on disk actually busts the browser's cache for its `<img src>`.
-		const stat = await app.vault.adapter.stat(path);
-		const resourcePath = app.vault.adapter.getResourcePath(path);
-		const src = stat
-			? `${resourcePath}${resourcePath.includes("?") ? "&" : "?"}hexcrawl-mtime=${stat.mtime}`
-			: resourcePath;
-		icons.set(basename, src);
-	}
+	await Promise.all(
+		iconFiles.map(async ({ path, basename }) => {
+			// getResourcePath() alone returns a bare, stable URL for an adapter path (unlike the
+			// TFile overload, which appends the file's mtime itself) — append it here so editing an
+			// icon's contents on disk actually busts the browser's cache for its `<img src>`.
+			const stat = await app.vault.adapter.stat(path);
+			const resourcePath = app.vault.adapter.getResourcePath(path);
+			const src = stat
+				? `${resourcePath}${resourcePath.includes("?") ? "&" : "?"}hexcrawl-mtime=${stat.mtime}`
+				: resourcePath;
+			icons.set(basename, src);
+		}),
+	);
 	return icons;
 }

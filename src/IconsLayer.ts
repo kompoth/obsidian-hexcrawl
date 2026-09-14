@@ -2,7 +2,7 @@ import { App } from "obsidian";
 import type { HexcrawlBlockParams, HexNoteData } from "./types";
 import { hexCenter, hexKey, hexSize } from "./hexGeometry";
 import { loadIcons } from "./dataLoaders";
-import { resolvePaletteEntry } from "./pure";
+import { resolveIconName } from "./pure";
 
 const ICON_SCALE = 0.9;
 
@@ -69,7 +69,7 @@ export class IconsLayer {
 			for (let q = 0; q < cols; q++) {
 				const key = hexKey(q, r);
 				const note = hexNotes.get(key);
-				const iconName = note?.icon ?? resolvePaletteEntry(note, palette)?.icon;
+				const iconName = resolveIconName(note, palette);
 				if (!iconName) continue;
 				const iconSrc = this.iconSrcs?.get(iconName);
 				if (!iconSrc) continue;
@@ -94,7 +94,7 @@ export class IconsLayer {
 		if (!el) return;
 		const key = hexKey(q, r);
 		const { orientation, stagger, hexSize: radius, palette } = this.params;
-		const iconName = note.icon ?? resolvePaletteEntry(note, palette)?.icon;
+		const iconName = resolveIconName(note, palette);
 		const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
 		const iconEl = this.iconElements.get(key);
 

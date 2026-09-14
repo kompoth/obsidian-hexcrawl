@@ -19,6 +19,22 @@ export function resolvePaletteEntry(
 	return note?.terrain ? palette?.terrain[note.terrain] : undefined;
 }
 
+/** A hex's terrain color: the palette's for its hex-terrain, else the literal hex-terrain value. */
+export function resolveHexColor(
+	note: HexNoteData | undefined,
+	palette: Palette | undefined,
+): string {
+	return resolvePaletteEntry(note, palette)?.color ?? note?.terrain ?? "";
+}
+
+/** A hex's icon name: its own hex-icon override, else the palette's for its hex-terrain. */
+export function resolveIconName(
+	note: HexNoteData | undefined,
+	palette: Palette | undefined,
+): string | undefined {
+	return note?.icon ?? resolvePaletteEntry(note, palette)?.icon;
+}
+
 /** Looks up a global palette by name, falling back to the settings' default when `name` is undefined. */
 export function resolveNamedPalette(
 	name: string | undefined,

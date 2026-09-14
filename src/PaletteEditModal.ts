@@ -215,6 +215,9 @@ export class PaletteEditModal extends Modal {
  *  in one of a palette's dictionaries, renaming it (with collision checks) on close. */
 abstract class PaletteEntryModal<T> extends Modal {
 	protected pendingKey: string;
+	/** Set once this modal has closed, so an in-flight async renderFields() (e.g. TerrainEntryModal's
+	 *  icon load) can tell its result is stale and skip building fields into a gone-away contentEl. */
+	protected closed = false;
 
 	constructor(
 		app: App,
@@ -243,6 +246,7 @@ abstract class PaletteEntryModal<T> extends Modal {
 	}
 
 	onClose(): void {
+		this.closed = true;
 		this.commitRename();
 		this.contentEl.empty();
 		this.onDone();
@@ -302,6 +306,7 @@ class TerrainEntryModal extends PaletteEntryModal<TerrainPaletteEntry> {
 		const iconSrcs = palette.iconsFolder
 			? await loadIcons(this.app, palette.iconsFolder)
 			: new Map<string, string>();
+		if (this.closed) return;
 
 		const previewEl = contentEl.createDiv({ cls: "hexcrawl-settings-preview" });
 		const updatePreview = () => {
