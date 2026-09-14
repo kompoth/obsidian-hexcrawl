@@ -1,11 +1,29 @@
 import { App, normalizePath, Notice, setIcon, TFile, TFolder } from "obsidian";
-import type { HexCoord, HexcrawlBlockParams, Palette, PathData } from "./types";
+import type {
+	HexCoord,
+	HexcrawlBlockParams,
+	Palette,
+	PathData,
+	PathStyleEntry,
+} from "./types";
 import { hexCenter, sharpPath, smoothPath } from "./hexGeometry";
 import { createDrawerItem, renderDrawerEmpty } from "./Toolbar";
 import { dashArray, parsePathFrontmatter, uniqueFileName } from "./pure";
 
-const DEFAULT_PATH_WIDTH = 3;
+export const DEFAULT_PATH_WIDTH = 3;
 const MIN_HITAREA_WIDTH = 14;
+
+/** Renders a path type's color/width/dash onto a preview swatch's top border — shared by the
+ *  Path tool's drawer and the palette settings' terrain/path-type previews. */
+export function applyPathPreviewStyle(
+	el: HTMLElement,
+	style: PathStyleEntry,
+): void {
+	el.style.borderTopColor = style.color ?? "var(--text-muted)";
+	el.style.borderTopWidth = `${Math.min(Math.max(style.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
+	el.style.borderTopStyle =
+		style.dash === "dotted" || style.dash === "dashed" ? style.dash : "solid";
+}
 
 export function loadPaths(app: App, folder: TFolder): PathData[] {
 	const paths: PathData[] = [];
@@ -49,10 +67,7 @@ function renderPathTypeItem(
 ): void {
 	const { previewEl } = createDrawerItem(scrollEl, name, onSelect);
 	const lineEl = previewEl.createDiv({ cls: "hexcrawl-drawer-path-line" });
-	lineEl.style.borderTopColor = style.color ?? "var(--text-muted)";
-	lineEl.style.borderTopWidth = `${Math.min(Math.max(style.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-	lineEl.style.borderTopStyle =
-		style.dash === "dotted" || style.dash === "dashed" ? style.dash : "solid";
+	applyPathPreviewStyle(lineEl, style);
 }
 
 /** Owns the paths list, their SVG rendering, and the Path tool's own drawer/click state machine. */
@@ -113,8 +128,9 @@ export class PathTool {
 	 * path mutation instead of rebuilding the whole grid, so pan/zoom/tool state survives.
 	 */
 	render(): void {
-		if (!this.pathsSvg) return;
-		this.pathsSvg.empty();
+		const pathsSvg = this.pathsSvg;
+		if (!pathsSvg) return;
+		pathsSvg.empty();
 		const { orientation, hexSize: radius, palette, stagger } = this.params;
 		const gutter = this.gutter;
 		const toPt = (h: HexCoord) => {
@@ -129,7 +145,7 @@ export class PathTool {
 			const d = spline ? smoothPath(points) : sharpPath(points);
 			const width = style?.width ?? DEFAULT_PATH_WIDTH;
 
-			const pathEl = this.pathsSvg.createSvg("path", {
+			const pathEl = pathsSvg.createSvg("path", {
 				cls: path.type
 					? ["hexcrawl-path", `hexcrawl-path-${path.type}`]
 					: "hexcrawl-path",
@@ -144,7 +160,7 @@ export class PathTool {
 				pathEl.createSvg("title").textContent = path.name;
 
 			// Wider, invisible sibling so a thin/dashed line is still easy to click/select.
-			const hitEl = this.pathsSvg.createSvg("path", {
+			const hitEl = pathsSvg.createSvg("path", {
 				cls: "hexcrawl-path-hitarea",
 				attr: { d, fill: "none", "data-note-path": path.notePath },
 			});
@@ -159,7 +175,7 @@ export class PathTool {
 				const style = state.type ? palette?.paths[state.type] : undefined;
 				const width = style?.width ?? DEFAULT_PATH_WIDTH;
 				const d = style?.spline ? smoothPath(points) : sharpPath(points);
-				const previewEl = this.pathsSvg.createSvg("path", {
+				const previewEl = pathsSvg.createSvg("path", {
 					cls: "hexcrawl-path-preview",
 					attr: { d, fill: "none" },
 				});
@@ -170,7 +186,7 @@ export class PathTool {
 					: "none";
 			}
 			for (const p of points) {
-				this.pathsSvg.createSvg("circle", {
+				pathsSvg.createSvg("circle", {
 					cls: "hexcrawl-path-marker",
 					attr: { cx: String(p.cx), cy: String(p.cy), r: "5" },
 				});
@@ -180,7 +196,7 @@ export class PathTool {
 		if (state.mode === "editing") {
 			const points = state.path.hexes.map(toPt);
 			points.forEach((p, i) => {
-				const marker = this.pathsSvg!.createSvg("circle", {
+				const marker = pathsSvg.createSvg("circle", {
 					cls: "hexcrawl-path-marker",
 					attr: {
 						cx: String(p.cx),
@@ -195,7 +211,7 @@ export class PathTool {
 				for (let i = 0; i < points.length - 1; i++) {
 					const mx = (points[i].cx + points[i + 1].cx) / 2;
 					const my = (points[i].cy + points[i + 1].cy) / 2;
-					this.pathsSvg.createSvg("circle", {
+					pathsSvg.createSvg("circle", {
 						cls: "hexcrawl-path-marker-add",
 						attr: {
 							cx: String(mx),
@@ -209,7 +225,7 @@ export class PathTool {
 				if (points.length >= 2) {
 					const first = points[0];
 					const second = points[1];
-					this.pathsSvg.createSvg("circle", {
+					pathsSvg.createSvg("circle", {
 						cls: "hexcrawl-path-marker-add",
 						attr: {
 							cx: String(first.cx + (first.cx - second.cx) * 0.5),
@@ -220,7 +236,7 @@ export class PathTool {
 					});
 					const last = points[points.length - 1];
 					const secondLast = points[points.length - 2];
-					this.pathsSvg.createSvg("circle", {
+					pathsSvg.createSvg("circle", {
 						cls: "hexcrawl-path-marker-add",
 						attr: {
 							cx: String(last.cx + (last.cx - secondLast.cx) * 0.5),
@@ -562,8 +578,11 @@ export class PathTool {
 	private async savePathHexes(path: PathData): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(path.notePath);
 		if (!(file instanceof TFile)) return;
-		await this.app.fileManager.processFrontMatter(file, (fm) => {
-			fm["path-hexes"] = path.hexes.map((h) => [h.q, h.r]);
-		});
+		await this.app.fileManager.processFrontMatter(
+			file,
+			(fm: Record<string, unknown>) => {
+				fm["path-hexes"] = path.hexes.map((h) => [h.q, h.r]);
+			},
+		);
 	}
 }

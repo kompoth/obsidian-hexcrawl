@@ -6,7 +6,12 @@ import {
 	TFolder,
 } from "obsidian";
 import type { HexCoord, HexcrawlBlockParams, HexNoteData } from "./types";
-import { gridBoundingBox, hexCenter, hexNeighbors } from "./hexGeometry";
+import {
+	gridBoundingBox,
+	hexCenter,
+	hexKey,
+	hexNeighbors,
+} from "./hexGeometry";
 import { loadHexNotes } from "./dataLoaders";
 import { resolveIconsFolder } from "./pure";
 import { setupPanAndZoom } from "./PanZoom";
@@ -21,6 +26,9 @@ const MIN_GUTTER = 20;
 export class HexMapRenderer {
 	private folder: TFolder | null = null;
 	private hexNotes = new Map<string, HexNoteData>();
+	/** Hex keys with a note-creation currently in flight, so a double-click on the same
+	 *  unconfigured hex can't race two vault.create() calls onto the same new file path. */
+	private pendingCreates = new Set<string>();
 
 	private toolbar: Toolbar;
 	private pathTool: PathTool;
@@ -214,34 +222,42 @@ export class HexMapRenderer {
 	private async runTool(
 		q: number,
 		r: number,
-		activeTool: ToolKind,
+		activeTool: Exclude<ToolKind, "path">,
 		selection: DrawerSelection | null,
 	): Promise<void> {
 		if (!selection) return;
 
-		if (activeTool === "brush") {
-			await this.writeHexField(
-				q,
-				r,
-				"hex-terrain",
-				selection.erase ? undefined : selection.value,
-			);
-		} else if (activeTool === "icon") {
-			await this.writeHexField(
-				q,
-				r,
-				"hex-icon",
-				selection.erase ? undefined : selection.value,
-			);
-		} else if (activeTool === "bucket" && !selection.erase) {
-			await this.bucketFill(q, r, selection.value);
+		switch (activeTool) {
+			case "brush":
+				await this.writeHexField(
+					q,
+					r,
+					"hex-terrain",
+					selection.erase ? undefined : selection.value,
+				);
+				break;
+			case "icon":
+				await this.writeHexField(
+					q,
+					r,
+					"hex-icon",
+					selection.erase ? undefined : selection.value,
+				);
+				break;
+			case "bucket":
+				if (!selection.erase) await this.bucketFill(q, r, selection.value);
+				break;
+			case "layers":
+				break; // Layers tool has no per-hex click effect.
+			default:
+				activeTool satisfies never;
 		}
 	}
 
 	/** Flood-fills the contiguous region of hexes sharing the clicked hex's current hex-terrain. */
 	private async bucketFill(q: number, r: number, value: string): Promise<void> {
 		const { cols, rows, orientation, stagger } = this.params;
-		const startTerrain = this.hexNotes.get(`${q},${r}`)?.terrain;
+		const startTerrain = this.hexNotes.get(hexKey(q, r))?.terrain;
 
 		const visited = new Set<string>();
 		const stack: HexCoord[] = [{ q, r }];
@@ -250,13 +266,13 @@ export class HexMapRenderer {
 		while (stack.length > 0) {
 			const cur = stack.pop()!;
 			if (cur.q < 0 || cur.q >= cols || cur.r < 0 || cur.r >= rows) continue;
-			const key = `${cur.q},${cur.r}`;
+			const key = hexKey(cur.q, cur.r);
 			if (visited.has(key)) continue;
 			visited.add(key);
 			if (this.hexNotes.get(key)?.terrain !== startTerrain) continue;
 			region.push(cur);
 			for (const n of hexNeighbors(cur.q, cur.r, orientation, stagger)) {
-				if (!visited.has(`${n.q},${n.r}`)) stack.push(n);
+				if (!visited.has(hexKey(n.q, n.r))) stack.push(n);
 			}
 		}
 
@@ -280,21 +296,24 @@ export class HexMapRenderer {
 		field: "hex-terrain" | "hex-icon",
 		value: string | undefined,
 	): Promise<void> {
-		const key = `${q},${r}`;
+		const key = hexKey(q, r);
 		const existing = this.hexNotes.get(key);
+		const patch = (base: { terrain?: string; icon?: string }) => ({
+			terrain: field === "hex-terrain" ? value : base.terrain,
+			icon: field === "hex-icon" ? value : base.icon,
+		});
 
 		if (existing) {
 			const file = this.app.vault.getAbstractFileByPath(existing.path);
 			if (!(file instanceof TFile)) return;
-			await this.app.fileManager.processFrontMatter(file, (fm) => {
-				if (value === undefined) delete fm[field];
-				else fm[field] = value;
-			});
-			const updated: HexNoteData = {
-				...existing,
-				terrain: field === "hex-terrain" ? value : existing.terrain,
-				icon: field === "hex-icon" ? value : existing.icon,
-			};
+			await this.app.fileManager.processFrontMatter(
+				file,
+				(fm: Record<string, unknown>) => {
+					if (value === undefined) delete fm[field];
+					else fm[field] = value;
+				},
+			);
+			const updated: HexNoteData = { ...existing, ...patch(existing) };
 			this.hexNotes.set(key, updated);
 			this.terrainLayer.updateHex(q, r, updated);
 			this.iconsLayer.updateHex(q, r, updated);
@@ -302,18 +321,22 @@ export class HexMapRenderer {
 		}
 
 		if (value === undefined || !this.folder) return;
-
-		const path = normalizePath(`${this.folder.path}/_r${r}_q${q}.md`);
-		const content = `---\nhex-q: ${q}\nhex-r: ${r}\n${field}: ${JSON.stringify(value)}\n---\n`;
-		const file = await this.app.vault.create(path, content);
-		const created: HexNoteData = {
-			path: file.path,
-			name: file.basename,
-			terrain: field === "hex-terrain" ? value : undefined,
-			icon: field === "hex-icon" ? value : undefined,
-		};
-		this.hexNotes.set(key, created);
-		this.terrainLayer.updateHex(q, r, created);
-		this.iconsLayer.updateHex(q, r, created);
+		if (this.pendingCreates.has(key)) return;
+		this.pendingCreates.add(key);
+		try {
+			const path = normalizePath(`${this.folder.path}/_r${r}_q${q}.md`);
+			const content = `---\nhex-q: ${q}\nhex-r: ${r}\n${field}: ${JSON.stringify(value)}\n---\n`;
+			const file = await this.app.vault.create(path, content);
+			const created: HexNoteData = {
+				path: file.path,
+				name: file.basename,
+				...patch({}),
+			};
+			this.hexNotes.set(key, created);
+			this.terrainLayer.updateHex(q, r, created);
+			this.iconsLayer.updateHex(q, r, created);
+		} finally {
+			this.pendingCreates.delete(key);
+		}
 	}
 }

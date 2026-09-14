@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import type HexcrawlPlugin from "../main";
 import { PaletteEditModal } from "./PaletteEditModal";
 import { uniqueKey } from "./pure";
+import type { Palette } from "./types";
 
 export class HexcrawlSettingTab extends PluginSettingTab {
 	constructor(
@@ -14,7 +15,7 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		containerEl.createEl("h2", { text: "Hexcrawl palettes" });
+		new Setting(containerEl).setName("Palettes").setHeading();
 		containerEl.createEl("p", {
 			text: "Reference a palette from a block with `palette: <name>`, or omit it to use the default one.",
 			cls: "setting-item-description",
@@ -78,7 +79,7 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 					);
 					this.plugin.settings.palettes[copyName] = JSON.parse(
 						JSON.stringify(this.plugin.settings.palettes[name]),
-					);
+					) as Palette;
 					void this.plugin.saveSettings();
 					this.display();
 				}),

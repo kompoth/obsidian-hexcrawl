@@ -1,8 +1,8 @@
 import { App } from "obsidian";
 import type { HexcrawlBlockParams, HexNoteData } from "./types";
-import { hexCenter, hexSize } from "./hexGeometry";
+import { hexCenter, hexKey, hexSize } from "./hexGeometry";
 import { loadIcons } from "./dataLoaders";
-import { resolvePaletteEntry } from "./pure";
+import { resolveIconName } from "./pure";
 
 const ICON_SCALE = 0.9;
 
@@ -52,7 +52,8 @@ export class IconsLayer {
 	}
 
 	render(hexNotes: Map<string, HexNoteData>, gutter: number): void {
-		if (!this.el) return;
+		const el = this.el;
+		if (!el) return;
 		this.gutter = gutter;
 		const {
 			orientation,
@@ -66,15 +67,18 @@ export class IconsLayer {
 
 		for (let r = 0; r < rows; r++) {
 			for (let q = 0; q < cols; q++) {
-				const note = hexNotes.get(`${q},${r}`);
-				const iconName = note?.icon ?? resolvePaletteEntry(note, palette)?.icon;
-				const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
+				const key = hexKey(q, r);
+				const note = hexNotes.get(key);
+				const iconName = resolveIconName(note, palette);
+				if (!iconName) continue;
+				const iconSrc = this.iconSrcs?.get(iconName);
 				if (!iconSrc) continue;
 				const center = hexCenter(q, r, orientation, radius, stagger);
 				this.placeIcon(
-					`${q},${r}`,
+					el,
+					key,
 					iconSrc,
-					iconName!,
+					iconName,
 					gutter + center.cx,
 					gutter + center.cy,
 					hexW,
@@ -86,20 +90,22 @@ export class IconsLayer {
 
 	/** Re-derives one hex's icon (add/update/remove) from its current note data. */
 	updateHex(q: number, r: number, note: HexNoteData): void {
-		if (!this.el) return;
-		const key = `${q},${r}`;
+		const el = this.el;
+		if (!el) return;
+		const key = hexKey(q, r);
 		const { orientation, stagger, hexSize: radius, palette } = this.params;
-		const iconName = note.icon ?? resolvePaletteEntry(note, palette)?.icon;
+		const iconName = resolveIconName(note, palette);
 		const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
 		const iconEl = this.iconElements.get(key);
 
-		if (iconSrc) {
+		if (iconName && iconSrc) {
 			const center = hexCenter(q, r, orientation, radius, stagger);
 			const { w: hexW, h: hexH } = hexSize(radius, orientation);
 			this.placeIcon(
+				el,
 				key,
 				iconSrc,
-				iconName!,
+				iconName,
 				this.gutter + center.cx,
 				this.gutter + center.cy,
 				hexW,
@@ -112,6 +118,7 @@ export class IconsLayer {
 	}
 
 	private placeIcon(
+		container: HTMLElement,
 		key: string,
 		src: string,
 		alt: string,
@@ -125,7 +132,7 @@ export class IconsLayer {
 		let iconEl = this.iconElements.get(key);
 
 		if (!iconEl) {
-			iconEl = this.el!.createEl("img", { cls: "hexcrawl-hex-icon" });
+			iconEl = container.createEl("img", { cls: "hexcrawl-hex-icon" });
 			iconEl.draggable = false;
 			iconEl.tabIndex = -1;
 			iconEl.addEventListener("dragstart", (e) => e.preventDefault());

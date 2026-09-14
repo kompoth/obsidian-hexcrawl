@@ -1,7 +1,7 @@
 import { setTooltip } from "obsidian";
 import type { HexcrawlBlockParams, HexNoteData } from "./types";
-import { hexCenter, hexSize } from "./hexGeometry";
-import { resolvePaletteEntry } from "./pure";
+import { hexCenter, hexKey, hexSize } from "./hexGeometry";
+import { resolveHexColor } from "./pure";
 
 /** The hex grid's terrain-color layer — its cells double as the click hit-targets used by tool
  *  painting and note-opening, so this is also where those cells physically live. */
@@ -33,7 +33,7 @@ export class TerrainLayer {
 
 		for (let r = 0; r < rows; r++) {
 			for (let q = 0; q < cols; q++) {
-				const key = `${q},${r}`;
+				const key = hexKey(q, r);
 				const center = hexCenter(q, r, orientation, radius, stagger);
 				const note = hexNotes.get(key);
 
@@ -50,8 +50,7 @@ export class TerrainLayer {
 				hexEl.style.left = `${gutter + center.cx - hexW / 2}px`;
 				hexEl.style.top = `${gutter + center.cy - hexH / 2}px`;
 
-				const color =
-					resolvePaletteEntry(note, palette)?.color ?? note?.terrain ?? "";
+				const color = resolveHexColor(note, palette);
 				this.hexColors.set(key, color);
 				if (this.visible && color) hexEl.style.backgroundColor = color;
 
@@ -64,14 +63,11 @@ export class TerrainLayer {
 
 	/** Re-derives one hex's color/tooltip/clickability from its current note data. */
 	updateHex(q: number, r: number, note: HexNoteData): void {
-		const key = `${q},${r}`;
+		const key = hexKey(q, r);
 		const hexEl = this.hexElements.get(key);
 		if (!hexEl) return;
 
-		const color =
-			resolvePaletteEntry(note, this.params.palette)?.color ??
-			note.terrain ??
-			"";
+		const color = resolveHexColor(note, this.params.palette);
 		this.hexColors.set(key, color);
 		if (this.visible) hexEl.style.backgroundColor = color;
 
