@@ -26,8 +26,12 @@ export type EditSub = "move" | "add" | "remove";
 /** Nested state machine for the Path tool — everything else is single-click paint/fill. */
 export type PathToolState =
 	| { mode: "idle" }
-	| { mode: "choosingType" }
-	| { mode: "drawing"; type: string | undefined; hexes: HexCoord[]; prependNext: boolean }
+	| {
+			mode: "drawing";
+			type: string | undefined;
+			hexes: HexCoord[];
+			prependNext: boolean;
+	  }
 	| {
 			mode: "editing";
 			path: PathData;
@@ -47,7 +51,8 @@ function renderPathTypeItem(
 	const lineEl = previewEl.createDiv({ cls: "hexcrawl-drawer-path-line" });
 	lineEl.style.borderTopColor = style.color ?? "var(--text-muted)";
 	lineEl.style.borderTopWidth = `${Math.min(Math.max(style.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-	lineEl.style.borderTopStyle = style.dash === "dotted" || style.dash === "dashed" ? style.dash : "solid";
+	lineEl.style.borderTopStyle =
+		style.dash === "dotted" || style.dash === "dashed" ? style.dash : "solid";
 }
 
 /** Owns the paths list, their SVG rendering, and the Path tool's own drawer/click state machine. */
@@ -72,7 +77,11 @@ export class PathTool {
 
 	/** Creates the paths layer's own SVG under viewportEl (always, even with zero paths yet, so the
 	 *  Path tool can add the map's first path without a full grid re-render) and does the initial render. */
-	mount(viewportEl: HTMLElement, gutter: number, totalSize: { width: number; height: number }): void {
+	mount(
+		viewportEl: HTMLElement,
+		gutter: number,
+		totalSize: { width: number; height: number },
+	): void {
 		this.pathsSvg = viewportEl.createSvg("svg", {
 			cls: ["hexcrawl-layer", "hexcrawl-paths"],
 			attr: { width: totalSize.width, height: totalSize.height },
@@ -121,14 +130,18 @@ export class PathTool {
 			const width = style?.width ?? DEFAULT_PATH_WIDTH;
 
 			const pathEl = this.pathsSvg.createSvg("path", {
-				cls: path.type ? ["hexcrawl-path", `hexcrawl-path-${path.type}`] : "hexcrawl-path",
+				cls: path.type
+					? ["hexcrawl-path", `hexcrawl-path-${path.type}`]
+					: "hexcrawl-path",
 				attr: { d, fill: "none", "data-note-path": path.notePath },
 			});
 			const color = style?.color ?? path.type;
 			if (color) pathEl.style.stroke = color;
 			if (style?.width) pathEl.style.strokeWidth = String(style.width);
-			if (style?.dash) pathEl.style.strokeDasharray = dashArray(style.dash, width);
-			if (!path.name.startsWith("_")) pathEl.createSvg("title").textContent = path.name;
+			if (style?.dash)
+				pathEl.style.strokeDasharray = dashArray(style.dash, width);
+			if (!path.name.startsWith("_"))
+				pathEl.createSvg("title").textContent = path.name;
 
 			// Wider, invisible sibling so a thin/dashed line is still easy to click/select.
 			const hitEl = this.pathsSvg.createSvg("path", {
@@ -152,7 +165,9 @@ export class PathTool {
 				});
 				if (style?.color) previewEl.style.stroke = style.color;
 				if (style?.width) previewEl.style.strokeWidth = String(style.width);
-				previewEl.style.strokeDasharray = style?.dash ? dashArray(style.dash, width) : "none";
+				previewEl.style.strokeDasharray = style?.dash
+					? dashArray(style.dash, width)
+					: "none";
 			}
 			for (const p of points) {
 				this.pathsSvg.createSvg("circle", {
@@ -167,7 +182,12 @@ export class PathTool {
 			points.forEach((p, i) => {
 				const marker = this.pathsSvg!.createSvg("circle", {
 					cls: "hexcrawl-path-marker",
-					attr: { cx: String(p.cx), cy: String(p.cy), r: "6", "data-index": String(i) },
+					attr: {
+						cx: String(p.cx),
+						cy: String(p.cy),
+						r: "6",
+						"data-index": String(i),
+					},
 				});
 				if (state.sub === "move") this.attachMarkerDrag(marker, state.path, i);
 			});
@@ -177,7 +197,12 @@ export class PathTool {
 					const my = (points[i].cy + points[i + 1].cy) / 2;
 					this.pathsSvg.createSvg("circle", {
 						cls: "hexcrawl-path-marker-add",
-						attr: { cx: String(mx), cy: String(my), r: "4", "data-insert-at": String(i + 1) },
+						attr: {
+							cx: String(mx),
+							cy: String(my),
+							r: "4",
+							"data-insert-at": String(i + 1),
+						},
 					});
 				}
 				// Extrapolated markers just beyond each end, for prepending/appending a point.
@@ -210,7 +235,11 @@ export class PathTool {
 	}
 
 	/** Drag-to-move for a single path point marker; snaps to whichever hex the pointer is over on release. */
-	private attachMarkerDrag(markerEl: SVGCircleElement, path: PathData, index: number): void {
+	private attachMarkerDrag(
+		markerEl: SVGCircleElement,
+		path: PathData,
+		index: number,
+	): void {
 		markerEl.addEventListener("pointerdown", (e: PointerEvent) => {
 			e.stopPropagation();
 			e.preventDefault();
@@ -238,7 +267,8 @@ export class PathTool {
 				if (hexEl) {
 					const q = Number(hexEl.getAttribute("data-q"));
 					const r = Number(hexEl.getAttribute("data-r"));
-					if (Number.isInteger(q) && Number.isInteger(r)) void this.movePathPoint(path, index, q, r);
+					if (Number.isInteger(q) && Number.isInteger(r))
+						void this.movePathPoint(path, index, q, r);
 				}
 			};
 			markerEl.addEventListener("pointermove", onMove);
@@ -253,7 +283,11 @@ export class PathTool {
 		// regardless of whether we were idle or already editing another one.
 		const pathHit = hit.closest(".hexcrawl-path-hitarea");
 		const hitNotePath = pathHit?.getAttribute("data-note-path") ?? undefined;
-		if (hitNotePath && (state.mode === "idle" || (state.mode === "editing" && hitNotePath !== state.path.notePath))) {
+		if (
+			hitNotePath &&
+			(state.mode === "idle" ||
+				(state.mode === "editing" && hitNotePath !== state.path.notePath))
+		) {
 			const found = this.pathsList.find((p) => p.notePath === hitNotePath);
 			if (found) {
 				this.state = {
@@ -276,7 +310,9 @@ export class PathTool {
 			const q = Number(hexEl.getAttribute("data-q"));
 			const r = Number(hexEl.getAttribute("data-r"));
 			if (!Number.isInteger(q) || !Number.isInteger(r)) return;
-			const edge = state.prependNext ? state.hexes[0] : state.hexes[state.hexes.length - 1];
+			const edge = state.prependNext
+				? state.hexes[0]
+				: state.hexes[state.hexes.length - 1];
 			if (edge && edge.q === q && edge.r === r) return;
 			if (state.prependNext) state.hexes.unshift({ q, r });
 			else state.hexes.push({ q, r });
@@ -315,25 +351,22 @@ export class PathTool {
 				renderDrawerEmpty(scrollEl, "No paths folder configured");
 				return;
 			}
-			const { previewEl } = createDrawerItem(scrollEl, "New Path", () => {
-				this.state = { mode: "choosingType" };
-				this.refreshDrawer();
-			});
-			setIcon(previewEl, "plus");
+			const pathStyles = this.params.palette?.paths ?? {};
+			for (const name of Object.keys(pathStyles).sort()) {
+				renderPathTypeItem(scrollEl, name, pathStyles[name], () =>
+					this.startDrawingPath(name),
+				);
+			}
 			renderDrawerEmpty(scrollEl, "Click existing path to edit it...");
 			return;
 		}
 
-		if (state.mode === "choosingType") {
-			const pathStyles = this.params.palette?.paths ?? {};
-			for (const name of Object.keys(pathStyles).sort()) {
-				renderPathTypeItem(scrollEl, name, pathStyles[name], () => this.startDrawingPath(name));
-			}
-			return;
-		}
-
 		if (state.mode === "drawing") {
-			const { previewEl: cancelPreview } = createDrawerItem(scrollEl, "Cancel", () => this.cancelPathTool());
+			const { previewEl: cancelPreview } = createDrawerItem(
+				scrollEl,
+				"Cancel",
+				() => this.cancelPathTool(),
+			);
 			setIcon(cancelPreview, "x");
 			const { previewEl: dirPreview } = createDrawerItem(
 				scrollEl,
@@ -345,9 +378,13 @@ export class PathTool {
 			);
 			setIcon(dirPreview, state.prependNext ? "arrow-left" : "arrow-right");
 			if (state.hexes.length >= 2) {
-				const { previewEl: finishPreview } = createDrawerItem(scrollEl, "Finish", () => {
-					void this.createPathFromDrawing(state.type, state.hexes);
-				});
+				const { previewEl: finishPreview } = createDrawerItem(
+					scrollEl,
+					"Finish",
+					() => {
+						void this.createPathFromDrawing(state.type, state.hexes);
+					},
+				);
 				setIcon(finishPreview, "check");
 			} else {
 				renderDrawerEmpty(scrollEl, "Click hexes to add points…");
@@ -357,14 +394,22 @@ export class PathTool {
 
 		// editing
 		if (state.confirmDelete) {
-			const { previewEl: keepPreview } = createDrawerItem(scrollEl, "Keep", () => {
-				state.confirmDelete = false;
-				this.refreshDrawer();
-			});
+			const { previewEl: keepPreview } = createDrawerItem(
+				scrollEl,
+				"Keep",
+				() => {
+					state.confirmDelete = false;
+					this.refreshDrawer();
+				},
+			);
 			setIcon(keepPreview, "x");
-			const { previewEl: confirmPreview } = createDrawerItem(scrollEl, "Confirm Delete", () => {
-				void this.deleteSelectedPath(state.path);
-			});
+			const { previewEl: confirmPreview } = createDrawerItem(
+				scrollEl,
+				"Confirm Delete",
+				() => {
+					void this.deleteSelectedPath(state.path);
+				},
+			);
 			setIcon(confirmPreview, "trash-2");
 			confirmPreview.addClass("is-danger");
 			return;
@@ -376,13 +421,17 @@ export class PathTool {
 			{ kind: "remove", icon: "circle-minus", label: "Remove" },
 		];
 		for (const sub of subs) {
-			const { itemEl, previewEl } = createDrawerItem(scrollEl, sub.label, () => {
-				state.sub = sub.kind;
-				state.insertAt = null;
-				state.addAtStart = false;
-				this.render();
-				this.refreshDrawer();
-			});
+			const { itemEl, previewEl } = createDrawerItem(
+				scrollEl,
+				sub.label,
+				() => {
+					state.sub = sub.kind;
+					state.insertAt = null;
+					state.addAtStart = false;
+					this.render();
+					this.refreshDrawer();
+				},
+			);
 			setIcon(previewEl, sub.icon);
 			if (state.sub === sub.kind) itemEl.addClass("is-selected");
 		}
@@ -397,10 +446,14 @@ export class PathTool {
 			);
 			setIcon(dirPreview, state.addAtStart ? "arrow-left" : "arrow-right");
 		}
-		const { previewEl: delPreview } = createDrawerItem(scrollEl, "Delete Path", () => {
-			state.confirmDelete = true;
-			this.refreshDrawer();
-		});
+		const { previewEl: delPreview } = createDrawerItem(
+			scrollEl,
+			"Delete Path",
+			() => {
+				state.confirmDelete = true;
+				this.refreshDrawer();
+			},
+		);
 		setIcon(delPreview, "trash-2");
 	}
 
@@ -425,11 +478,18 @@ export class PathTool {
 	}
 
 	/** Creates the note for a finished new path, named from the default template — rename the note itself to change it. */
-	private async createPathFromDrawing(type: string | undefined, hexes: HexCoord[]): Promise<void> {
+	private async createPathFromDrawing(
+		type: string | undefined,
+		hexes: HexCoord[],
+	): Promise<void> {
 		if (!this.pathsFolder) return;
 		const folder = this.pathsFolder;
-		const fileName = uniqueFileName(this.nextDefaultPathName(), (candidate) =>
-			!!this.app.vault.getAbstractFileByPath(normalizePath(`${folder.path}/${candidate}.md`)),
+		const fileName = uniqueFileName(
+			this.nextDefaultPathName(),
+			(candidate) =>
+				!!this.app.vault.getAbstractFileByPath(
+					normalizePath(`${folder.path}/${candidate}.md`),
+				),
 		);
 		const path = normalizePath(`${folder.path}/${fileName}.md`);
 
@@ -440,7 +500,12 @@ export class PathTool {
 		lines.push("---", "");
 
 		const file = await this.app.vault.create(path, lines.join("\n"));
-		this.pathsList.push({ notePath: file.path, name: file.basename, type, hexes: [...hexes] });
+		this.pathsList.push({
+			notePath: file.path,
+			name: file.basename,
+			type,
+			hexes: [...hexes],
+		});
 		this.state = { mode: "idle" };
 		this.render();
 		this.refreshDrawer();
@@ -455,7 +520,12 @@ export class PathTool {
 		this.refreshDrawer();
 	}
 
-	private async movePathPoint(path: PathData, index: number, q: number, r: number): Promise<void> {
+	private async movePathPoint(
+		path: PathData,
+		index: number,
+		q: number,
+		r: number,
+	): Promise<void> {
 		path.hexes[index] = { q, r };
 		await this.savePathHexes(path);
 		this.render();
@@ -466,16 +536,22 @@ export class PathTool {
 		q: number,
 		r: number,
 	): Promise<void> {
-		const at = state.insertAt ?? (state.addAtStart ? 0 : state.path.hexes.length);
+		const at =
+			state.insertAt ?? (state.addAtStart ? 0 : state.path.hexes.length);
 		state.path.hexes.splice(at, 0, { q, r });
 		state.insertAt = null;
 		await this.savePathHexes(state.path);
 		this.render();
 	}
 
-	private async removePathPoint(state: Extract<PathToolState, { mode: "editing" }>, index: number): Promise<void> {
+	private async removePathPoint(
+		state: Extract<PathToolState, { mode: "editing" }>,
+		index: number,
+	): Promise<void> {
 		if (state.path.hexes.length <= 2) {
-			new Notice("A path needs at least 2 points — use Delete Path to remove it entirely.");
+			new Notice(
+				"A path needs at least 2 points — use Delete Path to remove it entirely.",
+			);
 			return;
 		}
 		state.path.hexes.splice(index, 1);

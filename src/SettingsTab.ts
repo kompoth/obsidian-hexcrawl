@@ -16,7 +16,7 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.createEl("h2", { text: "Hexcrawl palettes" });
 		containerEl.createEl("p", {
-			text: 'Reference a palette from a block with `palette: <name>`, or omit it to use the default one.',
+			text: "Reference a palette from a block with `palette: <name>`, or omit it to use the default one.",
 			cls: "setting-item-description",
 		});
 
@@ -38,7 +38,9 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 	}
 
 	private openEditor(name: string): void {
-		new PaletteEditModal(this.app, this.plugin, name, () => this.display()).open();
+		new PaletteEditModal(this.app, this.plugin, name, () =>
+			this.display(),
+		).open();
 	}
 
 	private renderPaletteRow(containerEl: HTMLElement, name: string): void {
@@ -49,7 +51,9 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 		if (isDefault) setting.setDesc("Default");
 
 		setting.addExtraButton((btn) => {
-			btn.setIcon("star").setTooltip(isDefault ? "Default palette" : "Set as default");
+			btn
+				.setIcon("star")
+				.setTooltip(isDefault ? "Default palette" : "Set as default");
 			btn.setDisabled(isDefault);
 			btn.onClick(() => {
 				this.plugin.settings.defaultPalette = name;
@@ -68,19 +72,30 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 				.setIcon("copy")
 				.setTooltip("Duplicate")
 				.onClick(() => {
-					const copyName = uniqueKey(this.plugin.settings.palettes, `${name} copy`);
-					this.plugin.settings.palettes[copyName] = JSON.parse(JSON.stringify(this.plugin.settings.palettes[name]));
+					const copyName = uniqueKey(
+						this.plugin.settings.palettes,
+						`${name} copy`,
+					);
+					this.plugin.settings.palettes[copyName] = JSON.parse(
+						JSON.stringify(this.plugin.settings.palettes[name]),
+					);
 					void this.plugin.saveSettings();
 					this.display();
 				}),
 		);
 		setting.addExtraButton((btn) => {
-			btn.setIcon("trash-2").setTooltip(isOnly ? "At least one palette is required" : "Delete palette");
+			btn
+				.setIcon("trash-2")
+				.setTooltip(
+					isOnly ? "At least one palette is required" : "Delete palette",
+				);
 			btn.setDisabled(isOnly);
 			btn.onClick(() => {
 				delete this.plugin.settings.palettes[name];
 				if (isDefault) {
-					this.plugin.settings.defaultPalette = Object.keys(this.plugin.settings.palettes)[0];
+					this.plugin.settings.defaultPalette = Object.keys(
+						this.plugin.settings.palettes,
+					)[0];
 				}
 				void this.plugin.saveSettings();
 				this.display();

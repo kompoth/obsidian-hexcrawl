@@ -14,12 +14,21 @@ export class TerrainLayer {
 	constructor(private params: HexcrawlBlockParams) {}
 
 	mount(viewportEl: HTMLElement): void {
-		this.el = viewportEl.createDiv({ cls: ["hexcrawl-layer", "hexcrawl-layer-terrain"] });
+		this.el = viewportEl.createDiv({
+			cls: ["hexcrawl-layer", "hexcrawl-layer-terrain"],
+		});
 	}
 
 	render(hexNotes: Map<string, HexNoteData>, gutter: number): void {
 		if (!this.el) return;
-		const { orientation, stagger, hexSize: radius, cols, rows, palette } = this.params;
+		const {
+			orientation,
+			stagger,
+			hexSize: radius,
+			cols,
+			rows,
+			palette,
+		} = this.params;
 		const { w: hexW, h: hexH } = hexSize(radius, orientation);
 
 		for (let r = 0; r < rows; r++) {
@@ -41,7 +50,8 @@ export class TerrainLayer {
 				hexEl.style.left = `${gutter + center.cx - hexW / 2}px`;
 				hexEl.style.top = `${gutter + center.cy - hexH / 2}px`;
 
-				const color = resolvePaletteEntry(note, palette)?.color ?? note?.terrain ?? "";
+				const color =
+					resolvePaletteEntry(note, palette)?.color ?? note?.terrain ?? "";
 				this.hexColors.set(key, color);
 				if (this.visible && color) hexEl.style.backgroundColor = color;
 
@@ -58,7 +68,10 @@ export class TerrainLayer {
 		const hexEl = this.hexElements.get(key);
 		if (!hexEl) return;
 
-		const color = resolvePaletteEntry(note, this.params.palette)?.color ?? note.terrain ?? "";
+		const color =
+			resolvePaletteEntry(note, this.params.palette)?.color ??
+			note.terrain ??
+			"";
 		this.hexColors.set(key, color);
 		if (this.visible) hexEl.style.backgroundColor = color;
 
@@ -75,7 +88,9 @@ export class TerrainLayer {
 		if (this.visible === visible) return;
 		this.visible = visible;
 		for (const [key, hexEl] of this.hexElements) {
-			hexEl.style.backgroundColor = visible ? (this.hexColors.get(key) ?? "") : "";
+			hexEl.style.backgroundColor = visible
+				? (this.hexColors.get(key) ?? "")
+				: "";
 		}
 	}
 

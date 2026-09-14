@@ -2,7 +2,7 @@ import { Plugin } from "obsidian";
 import { parseHexcrawlParams } from "./src/params";
 import { HexMapRenderer } from "./src/HexMapRenderer";
 import { resolveNamedPalette } from "./src/pure";
-import { DEFAULT_SETTINGS } from "./src/settings";
+import { getDefaultSettings } from "./src/settings";
 import type { HexcrawlSettings } from "./src/settings";
 import { HexcrawlSettingTab } from "./src/SettingsTab";
 
@@ -14,7 +14,9 @@ export default class HexcrawlPlugin extends Plugin {
 		this.addSettingTab(new HexcrawlSettingTab(this.app, this));
 
 		this.registerMarkdownCodeBlockProcessor("hexcrawl", (source, el, ctx) => {
-			const result = parseHexcrawlParams(source, (name) => resolveNamedPalette(name, this.settings));
+			const result = parseHexcrawlParams(source, (name) =>
+				resolveNamedPalette(name, this.settings),
+			);
 			if (!result.ok) {
 				el.createEl("pre", { text: `hexcrawl: ${result.error}` });
 				return;
@@ -24,7 +26,14 @@ export default class HexcrawlPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const builtinIconsFolder = this.manifest.dir
+			? `${this.manifest.dir}/icons`
+			: undefined;
+		this.settings = Object.assign(
+			{},
+			getDefaultSettings(builtinIconsFolder),
+			await this.loadData(),
+		);
 	}
 
 	async saveSettings(): Promise<void> {

@@ -7,31 +7,36 @@ export interface HexcrawlSettings {
 	defaultPalette: string;
 }
 
-export const DEFAULT_PALETTE_NAME = "Wikipedia";
+export const DEFAULT_PALETTE_NAME = "Text Mapper";
 
-// Colors lifted from Wikipedia's topographic-map hypsometric tint scale
-// (Wikipedia:WikiProject_Maps/Conventions/Topographic_maps), repurposed here from
-// altitude bands to biomes: greens/teal for lowland vegetation and water, tan/sand
-// for arid ground, brown for high relief. River color is the guide's specified
-// "rivers/coasts" blue; road/trail reuse unused bands from the same brown gradient.
-const DEFAULT_PALETTE: Palette = {
-	terrain: {
-		plains: { color: "#D1D7AB", icon: "plains" },
-		forest: { color: "#94BF8B", icon: "forest" },
-		hills: { color: "#C3A76B", icon: "hills" },
-		mountains: { color: "#AA8753", icon: "mountains" },
-		desert: { color: "#EFEBC0", icon: "desert" },
-		swamp: { color: "#A7DFD2", icon: "swamp" },
-		water: { color: "#79B2DE", icon: "water" },
-	},
-	paths: {
-		road: { color: "#B9985A", width: 3, dash: "solid" },
-		river: { color: "#0978AB", width: 3, dash: "solid", spline: true },
-		trail: { color: "#D3CA9D", width: 2, dash: "dashed" },
-	},
-};
-
-export const DEFAULT_SETTINGS: HexcrawlSettings = {
-	palettes: { [DEFAULT_PALETTE_NAME]: DEFAULT_PALETTE },
-	defaultPalette: DEFAULT_PALETTE_NAME,
-};
+/** `iconsFolder` for the bundled palette below — the plugin's own installed `icons/` folder,
+ *  passed in by main.ts since it depends on where this install of the plugin actually lives. */
+export function getDefaultSettings(
+	builtinIconsFolder: string | undefined,
+): HexcrawlSettings {
+	// Terrain/path colors are the named fills from the Text Mapper/Gnomeyland DSL itself
+	// (campaignwiki.org/text-mapper's gnomeyland.txt) rather than invented hex values —
+	// picked per its own "suitable for X" grouping comments.
+	const defaultPalette: Palette = {
+		terrain: {
+			plains: { color: "#B0B446", icon: "grass" }, // soil
+			forest: { color: "#77904C", icon: "forest" }, // green
+			hills: { color: "#EBE785", icon: "hill" }, // dust
+			mountains: { color: "#ACBC9D", icon: "mountains" }, // gray
+			desert: { color: "#E3BEA3", icon: "desert" }, // sand
+			swamp: { color: "#6F9487", icon: "swamp" }, // blue-green
+			water: { color: "#6EBAE7", icon: "lake" }, // water
+		},
+		paths: {
+			road: { color: "#C97457", width: 5, dash: "solid" }, // dark-soil
+			river: { color: "#6EBAE7", width: 5, dash: "solid", spline: true },
+			trail: { color: "#000000", width: 3, dash: "dashed" },
+			seaway: { color: "#ffffff", width: 3, dash: "dashed", spline: true },
+		},
+		iconsFolder: builtinIconsFolder,
+	};
+	return {
+		palettes: { [DEFAULT_PALETTE_NAME]: defaultPalette },
+		defaultPalette: DEFAULT_PALETTE_NAME,
+	};
+}

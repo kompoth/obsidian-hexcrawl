@@ -1,4 +1,10 @@
-import { App, MarkdownPostProcessorContext, normalizePath, TFile, TFolder } from "obsidian";
+import {
+	App,
+	MarkdownPostProcessorContext,
+	normalizePath,
+	TFile,
+	TFolder,
+} from "obsidian";
 import type { HexCoord, HexcrawlBlockParams, HexNoteData } from "./types";
 import { gridBoundingBox, hexCenter, hexNeighbors } from "./hexGeometry";
 import { loadHexNotes } from "./dataLoaders";
@@ -32,7 +38,9 @@ export class HexMapRenderer {
 			populatePathDrawer: (scrollEl) => this.pathTool.populateDrawer(scrollEl),
 			populateLayersDrawer: (scrollEl) => this.populateLayersDrawer(scrollEl),
 		});
-		this.pathTool = new PathTool(app, params, () => this.toolbar.refreshDrawer());
+		this.pathTool = new PathTool(app, params, () =>
+			this.toolbar.refreshDrawer(),
+		);
 		this.terrainLayer = new TerrainLayer(params);
 		this.iconsLayer = new IconsLayer(app, params);
 	}
@@ -41,7 +49,9 @@ export class HexMapRenderer {
 		this.container.empty();
 		this.container.addClass("hexcrawl-block");
 
-		const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.params.folder));
+		const folder = this.app.vault.getAbstractFileByPath(
+			normalizePath(this.params.folder),
+		);
 		if (!(folder instanceof TFolder)) {
 			this.container.createEl("pre", {
 				text: `hexcrawl: folder not found: "${this.params.folder}"`,
@@ -55,12 +65,22 @@ export class HexMapRenderer {
 	}
 
 	private buildGrid(): void {
-		const { orientation, stagger, hexSize: radius, cols, rows, height, showCoords, pathsFolder } = this.params;
-		this.iconsLayer.load(resolveIconsFolder(this.params));
+		const {
+			orientation,
+			stagger,
+			hexSize: radius,
+			cols,
+			rows,
+			height,
+			showCoords,
+			pathsFolder,
+		} = this.params;
 		const pathsFolderObj = pathsFolder
 			? this.app.vault.getAbstractFileByPath(normalizePath(pathsFolder))
 			: undefined;
-		this.pathTool.load(pathsFolderObj instanceof TFolder ? pathsFolderObj : null);
+		this.pathTool.load(
+			pathsFolderObj instanceof TFolder ? pathsFolderObj : null,
+		);
 
 		const clipEl = this.container.createDiv({ cls: "hexcrawl-clip" });
 		clipEl.style.height = `${height}px`;
@@ -69,7 +89,10 @@ export class HexMapRenderer {
 
 		const gutter = showCoords ? Math.max(MIN_GUTTER, radius * 0.6) : 0;
 		const bbox = gridBoundingBox(cols, rows, orientation, radius, stagger);
-		const totalSize = { width: bbox.width + gutter, height: bbox.height + gutter };
+		const totalSize = {
+			width: bbox.width + gutter,
+			height: bbox.height + gutter,
+		};
 		viewportEl.style.width = `${totalSize.width}px`;
 		viewportEl.style.height = `${totalSize.height}px`;
 
@@ -82,11 +105,28 @@ export class HexMapRenderer {
 		this.pathTool.mount(viewportEl, gutter, totalSize);
 
 		this.iconsLayer.mount(viewportEl, totalSize);
-		this.iconsLayer.render(this.hexNotes, gutter);
+		void this.iconsLayer.load(resolveIconsFolder(this.params)).then(() => {
+			this.iconsLayer.render(this.hexNotes, gutter);
+		});
 
-		if (showCoords) this.renderAxisLabels(viewportEl, orientation, radius, cols, rows, gutter);
+		if (showCoords)
+			this.renderAxisLabels(
+				viewportEl,
+				orientation,
+				radius,
+				cols,
+				rows,
+				gutter,
+			);
 
-		setupPanAndZoom(this.container, this.ctx, clipEl, viewportEl, totalSize, (e) => this.handleClick(e));
+		setupPanAndZoom(
+			this.container,
+			this.ctx,
+			clipEl,
+			viewportEl,
+			totalSize,
+			(e) => this.handleClick(e),
+		);
 	}
 
 	private renderAxisLabels(
@@ -98,14 +138,22 @@ export class HexMapRenderer {
 		gutter: number,
 	): void {
 		for (let q = 0; q < cols; q++) {
-			const x = gutter + hexCenter(q, 0, orientation, radius, this.params.stagger).cx;
-			const labelEl = viewportEl.createDiv({ cls: "hexcrawl-axis-label", text: String(q) });
+			const x =
+				gutter + hexCenter(q, 0, orientation, radius, this.params.stagger).cx;
+			const labelEl = viewportEl.createDiv({
+				cls: "hexcrawl-axis-label",
+				text: String(q),
+			});
 			labelEl.style.left = `${x}px`;
 			labelEl.style.top = `${gutter / 2}px`;
 		}
 		for (let r = 0; r < rows; r++) {
-			const y = gutter + hexCenter(0, r, orientation, radius, this.params.stagger).cy;
-			const labelEl = viewportEl.createDiv({ cls: "hexcrawl-axis-label", text: String(r) });
+			const y =
+				gutter + hexCenter(0, r, orientation, radius, this.params.stagger).cy;
+			const labelEl = viewportEl.createDiv({
+				cls: "hexcrawl-axis-label",
+				text: String(r),
+			});
 			labelEl.style.left = `${gutter / 2}px`;
 			labelEl.style.top = `${y}px`;
 		}
@@ -163,13 +211,28 @@ export class HexMapRenderer {
 		}
 	}
 
-	private async runTool(q: number, r: number, activeTool: ToolKind, selection: DrawerSelection | null): Promise<void> {
+	private async runTool(
+		q: number,
+		r: number,
+		activeTool: ToolKind,
+		selection: DrawerSelection | null,
+	): Promise<void> {
 		if (!selection) return;
 
 		if (activeTool === "brush") {
-			await this.writeHexField(q, r, "hex-terrain", selection.erase ? undefined : selection.value);
+			await this.writeHexField(
+				q,
+				r,
+				"hex-terrain",
+				selection.erase ? undefined : selection.value,
+			);
 		} else if (activeTool === "icon") {
-			await this.writeHexField(q, r, "hex-icon", selection.erase ? undefined : selection.value);
+			await this.writeHexField(
+				q,
+				r,
+				"hex-icon",
+				selection.erase ? undefined : selection.value,
+			);
 		} else if (activeTool === "bucket" && !selection.erase) {
 			await this.bucketFill(q, r, selection.value);
 		}
@@ -197,9 +260,11 @@ export class HexMapRenderer {
 			}
 		}
 
-		for (const cell of region) {
-			await this.writeHexField(cell.q, cell.r, "hex-terrain", value);
-		}
+		await Promise.all(
+			region.map((cell) =>
+				this.writeHexField(cell.q, cell.r, "hex-terrain", value),
+			),
+		);
 	}
 
 	/**

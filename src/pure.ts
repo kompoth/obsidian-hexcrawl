@@ -3,7 +3,13 @@
  * own Obsidian-free module (only "./types" is imported) so they're unit-testable without
  * mocking the Obsidian API — that module has no runtime build, only type declarations.
  */
-import type { HexCoord, HexNoteData, Palette, PathDashStyle, TerrainPaletteEntry } from "./types";
+import type {
+	HexCoord,
+	HexNoteData,
+	Palette,
+	PathDashStyle,
+	TerrainPaletteEntry,
+} from "./types";
 
 /** The palette entry for a hex note's terrain, if any — shared by the terrain and icon layers. */
 export function resolvePaletteEntry(
@@ -22,7 +28,9 @@ export function resolveNamedPalette(
 }
 
 /** Icon names (terrain/hex-icon) are looked up in the active palette's own icons folder. */
-export function resolveIconsFolder(params: { palette?: Palette }): string | undefined {
+export function resolveIconsFolder(params: {
+	palette?: Palette;
+}): string | undefined {
 	return params.palette?.iconsFolder;
 }
 
@@ -33,9 +41,13 @@ export function parseHexNoteFrontmatter(
 	const r = Number(frontmatter["hex-r"]);
 	if (!Number.isInteger(q) || !Number.isInteger(r)) return null;
 	const terrainRaw = frontmatter["hex-terrain"];
-	const terrain = typeof terrainRaw === "string" && terrainRaw.trim() ? terrainRaw : undefined;
+	const terrain =
+		typeof terrainRaw === "string" && terrainRaw.trim()
+			? terrainRaw
+			: undefined;
 	const iconRaw = frontmatter["hex-icon"];
-	const icon = typeof iconRaw === "string" && iconRaw.trim() ? iconRaw.trim() : undefined;
+	const icon =
+		typeof iconRaw === "string" && iconRaw.trim() ? iconRaw.trim() : undefined;
 	return { q, r, terrain, icon };
 }
 
@@ -53,7 +65,8 @@ export function parsePathFrontmatter(
 	}
 	if (hexes.length < 2) return null;
 	const typeRaw = frontmatter["path-type"];
-	const type = typeof typeRaw === "string" && typeRaw.trim() ? typeRaw.trim() : undefined;
+	const type =
+		typeof typeRaw === "string" && typeRaw.trim() ? typeRaw.trim() : undefined;
 	const splineRaw = frontmatter["path-spline"];
 	const spline = typeof splineRaw === "boolean" ? splineRaw : undefined;
 	return { hexes, type, spline };
@@ -67,7 +80,10 @@ export function dashArray(dash: PathDashStyle, width: number): string {
 }
 
 /** Sanitizes a name into a free filename, appending " 2", " 3", ... on collision per `exists`. */
-export function uniqueFileName(name: string, exists: (candidate: string) => boolean): string {
+export function uniqueFileName(
+	name: string,
+	exists: (candidate: string) => boolean,
+): string {
 	const safe = name.replace(/[\\/:*?"<>|]/g, "-").trim() || "Path";
 	let candidate = safe;
 	let n = 2;
@@ -76,7 +92,11 @@ export function uniqueFileName(name: string, exists: (candidate: string) => bool
 }
 
 /** Renames a Record's key in place, preserving the insertion order of the other entries. */
-export function renameKey<T>(record: Record<string, T>, from: string, to: string): void {
+export function renameKey<T>(
+	record: Record<string, T>,
+	from: string,
+	to: string,
+): void {
 	const renamed: Record<string, T> = {};
 	for (const [key, value] of Object.entries(record)) {
 		renamed[key === from ? to : key] = value;
@@ -86,7 +106,10 @@ export function renameKey<T>(record: Record<string, T>, from: string, to: string
 }
 
 /** First free key: `base` itself, or `"${base} 2"`, `"${base} 3"`, ... on collision. */
-export function uniqueKey(record: Record<string, unknown>, base: string): string {
+export function uniqueKey(
+	record: Record<string, unknown>,
+	base: string,
+): string {
 	if (!(base in record)) return base;
 	let n = 2;
 	while (`${base} ${n}` in record) n++;

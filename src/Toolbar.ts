@@ -1,6 +1,6 @@
-import { App, setIcon, setTooltip, TFile } from "obsidian";
+import { App, setIcon, setTooltip } from "obsidian";
 import type { HexcrawlBlockParams } from "./types";
-import { loadIconFiles } from "./dataLoaders";
+import { loadIcons } from "./dataLoaders";
 import { resolveIconsFolder } from "./pure";
 
 export type ToolKind = "brush" | "bucket" | "icon" | "path" | "layers";
@@ -23,12 +23,16 @@ export function createDrawerItem(
 	label: string,
 	onSelect: () => void = () => {},
 ): { itemEl: HTMLElement; previewEl: HTMLElement } {
-	const itemEl = scrollEl.createDiv({ cls: "hexcrawl-drawer-item", attr: { role: "button", tabindex: "0" } });
+	const itemEl = scrollEl.createDiv({
+		cls: "hexcrawl-drawer-item",
+		attr: { role: "button", tabindex: "0" },
+	});
 	const previewEl = itemEl.createDiv({ cls: "hexcrawl-drawer-item-preview" });
 	itemEl.createDiv({ cls: "hexcrawl-drawer-item-label", text: label });
 
 	itemEl.addEventListener("click", () => {
-		for (const child of Array.from(scrollEl.children) as HTMLElement[]) child.removeClass("is-selected");
+		for (const child of Array.from(scrollEl.children) as HTMLElement[])
+			child.removeClass("is-selected");
 		itemEl.addClass("is-selected");
 		onSelect();
 	});
@@ -41,10 +45,14 @@ export function createDrawerItem(
 	return { itemEl, previewEl };
 }
 
-export function addDrawerPreviewImage(app: App, previewEl: HTMLElement, file: TFile): void {
+export function addDrawerPreviewImage(
+	previewEl: HTMLElement,
+	src: string,
+	alt: string,
+): void {
 	const imgEl = previewEl.createEl("img", { cls: "hexcrawl-drawer-item-img" });
-	imgEl.src = app.vault.getResourcePath(file);
-	imgEl.alt = file.basename;
+	imgEl.src = src;
+	imgEl.alt = alt;
 	imgEl.draggable = false;
 	imgEl.addEventListener("dragstart", (e) => e.preventDefault());
 }
@@ -60,7 +68,10 @@ export function createDrawerToggleItem(
 	isOn: () => boolean,
 	onToggle: () => void,
 ): void {
-	const itemEl = scrollEl.createDiv({ cls: "hexcrawl-drawer-item", attr: { role: "button", tabindex: "0" } });
+	const itemEl = scrollEl.createDiv({
+		cls: "hexcrawl-drawer-item",
+		attr: { role: "button", tabindex: "0" },
+	});
 	const previewEl = itemEl.createDiv({ cls: "hexcrawl-drawer-item-preview" });
 	itemEl.createDiv({ cls: "hexcrawl-drawer-item-label", text: label });
 
@@ -163,7 +174,8 @@ export class Toolbar {
 
 	/** Re-renders the drawer for whichever tool is currently active — used after Path-tool state changes. */
 	refreshDrawer(): void {
-		if (this.scrollEl && this._activeTool) this.populateDrawer(this.scrollEl, this._activeTool);
+		if (this.scrollEl && this._activeTool)
+			this.populateDrawer(this.scrollEl, this._activeTool);
 	}
 
 	private populateDrawer(scrollEl: HTMLElement, kind: ToolKind): void {
@@ -172,10 +184,10 @@ export class Toolbar {
 		switch (kind) {
 			case "brush":
 			case "bucket":
-				this.populateTerrainDrawer(scrollEl);
+				void this.populateTerrainDrawer(scrollEl);
 				break;
 			case "icon":
-				this.populateIconDrawer(scrollEl);
+				void this.populateIconDrawer(scrollEl);
 				break;
 			case "path":
 				this.hooks.populatePathDrawer(scrollEl);
@@ -193,7 +205,7 @@ export class Toolbar {
 		setIcon(previewEl, "eraser");
 	}
 
-	private populateTerrainDrawer(scrollEl: HTMLElement): void {
+	private async populateTerrainDrawer(scrollEl: HTMLElement): Promise<void> {
 		const terrain = this.params.palette?.terrain ?? {};
 		const names = Object.keys(terrain).sort();
 		if (names.length === 0) {
@@ -201,26 +213,28 @@ export class Toolbar {
 			return;
 		}
 		const iconsFolder = resolveIconsFolder(this.params);
-		const iconFiles = iconsFolder ? loadIconFiles(this.app, iconsFolder) : undefined;
+		const iconSrcs = iconsFolder
+			? await loadIcons(this.app, iconsFolder)
+			: undefined;
 		for (const name of names) {
 			const entry = terrain[name];
 			const { previewEl } = createDrawerItem(scrollEl, name, () => {
 				this._drawerSelection = { erase: false, value: name };
 			});
 			if (entry.color) previewEl.style.backgroundColor = entry.color;
-			const iconFile = entry.icon ? iconFiles?.get(entry.icon) : undefined;
-			if (iconFile) addDrawerPreviewImage(this.app, previewEl, iconFile);
+			const iconSrc = entry.icon ? iconSrcs?.get(entry.icon) : undefined;
+			if (iconSrc) addDrawerPreviewImage(previewEl, iconSrc, entry.icon!);
 		}
 	}
 
-	private populateIconDrawer(scrollEl: HTMLElement): void {
+	private async populateIconDrawer(scrollEl: HTMLElement): Promise<void> {
 		const iconsFolder = resolveIconsFolder(this.params);
 		if (!iconsFolder) {
 			renderDrawerEmpty(scrollEl, "No icons folder configured");
 			return;
 		}
-		const iconFiles = loadIconFiles(this.app, iconsFolder);
-		const names = [...iconFiles.keys()].sort();
+		const iconSrcs = await loadIcons(this.app, iconsFolder);
+		const names = [...iconSrcs.keys()].sort();
 		if (names.length === 0) {
 			renderDrawerEmpty(scrollEl, "No icons found");
 			return;
@@ -229,7 +243,7 @@ export class Toolbar {
 			const { previewEl } = createDrawerItem(scrollEl, name, () => {
 				this._drawerSelection = { erase: false, value: name };
 			});
-			addDrawerPreviewImage(this.app, previewEl, iconFiles.get(name)!);
+			addDrawerPreviewImage(previewEl, iconSrcs.get(name)!, name);
 		}
 	}
 }

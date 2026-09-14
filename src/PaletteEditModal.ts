@@ -1,7 +1,6 @@
 import { App, Modal, Notice, Setting } from "obsidian";
-import type { TFile } from "obsidian";
 import type HexcrawlPlugin from "../main";
-import { loadIconFiles } from "./dataLoaders";
+import { loadIcons } from "./dataLoaders";
 import { renameKey, uniqueKey } from "./pure";
 import type { Palette, PathDashStyle } from "./types";
 
@@ -59,7 +58,9 @@ export class PaletteEditModal extends Modal {
 
 		new Setting(contentEl)
 			.setName("Name")
-			.addText((text) => text.setValue(this.name).onChange((v) => (this.pendingName = v)));
+			.addText((text) =>
+				text.setValue(this.name).onChange((v) => (this.pendingName = v)),
+			);
 
 		new Setting(contentEl)
 			.setName("Icons folder")
@@ -71,19 +72,25 @@ export class PaletteEditModal extends Modal {
 					.onChange((v) => {
 						palette.iconsFolder = v.trim() || undefined;
 						void this.plugin.saveSettings();
-						this.renderTerrainList(terrainListEl);
+						void this.renderTerrainList(terrainListEl);
 					}),
 			);
 
 		contentEl.createEl("h3", { text: "Terrain" });
 		const terrainListEl = contentEl.createDiv();
-		this.renderTerrainList(terrainListEl);
+		void this.renderTerrainList(terrainListEl);
 		new Setting(contentEl).addButton((btn) =>
 			btn.setButtonText("Add terrain").onClick(() => {
 				const key = uniqueKey(palette.terrain, "New terrain");
 				palette.terrain[key] = {};
 				void this.plugin.saveSettings();
-				new TerrainEntryModal(this.app, this.plugin, this.name, key, () => this.renderTerrainList(terrainListEl)).open();
+				new TerrainEntryModal(
+					this.app,
+					this.plugin,
+					this.name,
+					key,
+					() => void this.renderTerrainList(terrainListEl),
+				).open();
 			}),
 		);
 
@@ -95,34 +102,51 @@ export class PaletteEditModal extends Modal {
 				const key = uniqueKey(palette.paths, "New path");
 				palette.paths[key] = {};
 				void this.plugin.saveSettings();
-				new PathEntryModal(this.app, this.plugin, this.name, key, () => this.renderPathList(pathListEl)).open();
+				new PathEntryModal(this.app, this.plugin, this.name, key, () =>
+					this.renderPathList(pathListEl),
+				).open();
 			}),
 		);
 
-		new Setting(contentEl).addButton((btn) => btn.setButtonText("Done").setCta().onClick(() => this.close()));
+		new Setting(contentEl).addButton((btn) =>
+			btn
+				.setButtonText("Done")
+				.setCta()
+				.onClick(() => this.close()),
+		);
 	}
 
-	private renderTerrainList(el: HTMLElement): void {
+	private async renderTerrainList(el: HTMLElement): Promise<void> {
 		el.empty();
 		const palette = this.palette;
-		const iconFiles = palette.iconsFolder ? loadIconFiles(this.app, palette.iconsFolder) : new Map<string, TFile>();
+		const iconSrcs = palette.iconsFolder
+			? await loadIcons(this.app, palette.iconsFolder)
+			: new Map<string, string>();
 
 		for (const key of Object.keys(palette.terrain)) {
 			const entry = palette.terrain[key];
 			const row = new Setting(el).setName(key);
-			const previewEl = row.controlEl.createDiv({ cls: "hexcrawl-settings-preview" });
+			const previewEl = row.controlEl.createDiv({
+				cls: "hexcrawl-settings-preview",
+			});
 			previewEl.style.backgroundColor = entry.color ?? "";
-			const iconFile = entry.icon ? iconFiles.get(entry.icon) : undefined;
-			if (iconFile) {
+			const iconSrc = entry.icon ? iconSrcs.get(entry.icon) : undefined;
+			if (iconSrc) {
 				const img = previewEl.createEl("img");
-				img.src = this.app.vault.getResourcePath(iconFile);
+				img.src = iconSrc;
 			}
 			row.addExtraButton((btn) =>
 				btn
 					.setIcon("pencil")
 					.setTooltip("Edit")
 					.onClick(() => {
-						new TerrainEntryModal(this.app, this.plugin, this.name, key, () => this.renderTerrainList(el)).open();
+						new TerrainEntryModal(
+							this.app,
+							this.plugin,
+							this.name,
+							key,
+							() => void this.renderTerrainList(el),
+						).open();
 					}),
 			);
 			row.addExtraButton((btn) =>
@@ -132,7 +156,7 @@ export class PaletteEditModal extends Modal {
 					.onClick(() => {
 						delete palette.terrain[key];
 						void this.plugin.saveSettings();
-						this.renderTerrainList(el);
+						void this.renderTerrainList(el);
 					}),
 			);
 		}
@@ -145,16 +169,23 @@ export class PaletteEditModal extends Modal {
 		for (const key of Object.keys(palette.paths)) {
 			const entry = palette.paths[key];
 			const row = new Setting(el).setName(key);
-			const previewEl = row.controlEl.createDiv({ cls: "hexcrawl-settings-path-preview" });
+			const previewEl = row.controlEl.createDiv({
+				cls: "hexcrawl-settings-path-preview",
+			});
 			previewEl.style.borderTopColor = entry.color ?? "var(--text-muted)";
 			previewEl.style.borderTopWidth = `${Math.min(Math.max(entry.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-			previewEl.style.borderTopStyle = entry.dash === "dotted" || entry.dash === "dashed" ? entry.dash : "solid";
+			previewEl.style.borderTopStyle =
+				entry.dash === "dotted" || entry.dash === "dashed"
+					? entry.dash
+					: "solid";
 			row.addExtraButton((btn) =>
 				btn
 					.setIcon("pencil")
 					.setTooltip("Edit")
 					.onClick(() => {
-						new PathEntryModal(this.app, this.plugin, this.name, key, () => this.renderPathList(el)).open();
+						new PathEntryModal(this.app, this.plugin, this.name, key, () =>
+							this.renderPathList(el),
+						).open();
 					}),
 			);
 			row.addExtraButton((btn) =>
@@ -192,7 +223,7 @@ class TerrainEntryModal extends Modal {
 
 	onOpen(): void {
 		this.setTitle("Edit terrain");
-		this.render();
+		void this.render();
 	}
 
 	onClose(): void {
@@ -214,46 +245,53 @@ class TerrainEntryModal extends Modal {
 		void this.plugin.saveSettings();
 	}
 
-	private render(): void {
+	private async render(): Promise<void> {
 		const { contentEl } = this;
 		contentEl.empty();
 		const palette = this.palette;
 		const entry = palette.terrain[this.key];
-		const iconFiles = palette.iconsFolder ? loadIconFiles(this.app, palette.iconsFolder) : new Map<string, TFile>();
+		const iconSrcs = palette.iconsFolder
+			? await loadIcons(this.app, palette.iconsFolder)
+			: new Map<string, string>();
 
 		const previewEl = contentEl.createDiv({ cls: "hexcrawl-settings-preview" });
 		const updatePreview = () => {
 			previewEl.empty();
 			previewEl.style.backgroundColor = entry.color ?? "";
-			const iconFile = entry.icon ? iconFiles.get(entry.icon) : undefined;
-			if (iconFile) {
+			const iconSrc = entry.icon ? iconSrcs.get(entry.icon) : undefined;
+			if (iconSrc) {
 				const img = previewEl.createEl("img");
-				img.src = this.app.vault.getResourcePath(iconFile);
+				img.src = iconSrc;
 			}
 		};
 		updatePreview();
 
 		new Setting(contentEl)
 			.setName("Name")
-			.addText((text) => text.setValue(this.key).onChange((v) => (this.pendingKey = v)));
-
-		new Setting(contentEl)
-			.setName("Color")
-			.addColorPicker((color) =>
-				color.setValue(entry.color ?? "#888888").onChange((v) => {
-					entry.color = v;
-					updatePreview();
-					void this.plugin.saveSettings();
-				}),
+			.addText((text) =>
+				text.setValue(this.key).onChange((v) => (this.pendingKey = v)),
 			);
+
+		new Setting(contentEl).setName("Color").addColorPicker((color) =>
+			color.setValue(entry.color ?? "#888888").onChange((v) => {
+				entry.color = v;
+				updatePreview();
+				void this.plugin.saveSettings();
+			}),
+		);
 
 		new Setting(contentEl)
 			.setName("Icon")
-			.setDesc(palette.iconsFolder ? "" : "Set the palette's icons folder above to pick an icon.")
+			.setDesc(
+				palette.iconsFolder
+					? ""
+					: "Set the palette's icons folder above to pick an icon.",
+			)
 			.addDropdown((dropdown) => {
 				dropdown.addOption("", "No icon");
-				for (const iconName of [...iconFiles.keys()].sort()) dropdown.addOption(iconName, iconName);
-				if (entry.icon && !iconFiles.has(entry.icon)) {
+				for (const iconName of [...iconSrcs.keys()].sort())
+					dropdown.addOption(iconName, iconName);
+				if (entry.icon && !iconSrcs.has(entry.icon)) {
 					dropdown.addOption(entry.icon, `${entry.icon} (missing)`);
 				}
 				dropdown.setValue(entry.icon ?? "");
@@ -277,7 +315,12 @@ class TerrainEntryModal extends Modal {
 						this.close();
 					}),
 			)
-			.addButton((btn) => btn.setButtonText("Done").setCta().onClick(() => this.close()));
+			.addButton((btn) =>
+				btn
+					.setButtonText("Done")
+					.setCta()
+					.onClick(() => this.close()),
+			);
 	}
 }
 
@@ -330,42 +373,46 @@ class PathEntryModal extends Modal {
 		const palette = this.palette;
 		const entry = palette.paths[this.key];
 
-		const previewEl = contentEl.createDiv({ cls: "hexcrawl-settings-path-preview" });
+		const previewEl = contentEl.createDiv({
+			cls: "hexcrawl-settings-path-preview",
+		});
 		const updatePreview = () => {
 			previewEl.style.borderTopColor = entry.color ?? "var(--text-muted)";
 			previewEl.style.borderTopWidth = `${Math.min(Math.max(entry.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-			previewEl.style.borderTopStyle = entry.dash === "dotted" || entry.dash === "dashed" ? entry.dash : "solid";
+			previewEl.style.borderTopStyle =
+				entry.dash === "dotted" || entry.dash === "dashed"
+					? entry.dash
+					: "solid";
 		};
 		updatePreview();
 
 		new Setting(contentEl)
 			.setName("Name")
-			.addText((text) => text.setValue(this.key).onChange((v) => (this.pendingKey = v)));
+			.addText((text) =>
+				text.setValue(this.key).onChange((v) => (this.pendingKey = v)),
+			);
 
-		new Setting(contentEl)
-			.setName("Color")
-			.addColorPicker((color) =>
-				color.setValue(entry.color ?? "#888888").onChange((v) => {
-					entry.color = v;
+		new Setting(contentEl).setName("Color").addColorPicker((color) =>
+			color.setValue(entry.color ?? "#888888").onChange((v) => {
+				entry.color = v;
+				updatePreview();
+				void this.plugin.saveSettings();
+			}),
+		);
+
+		new Setting(contentEl).setName("Width").addText((text) =>
+			text
+				.setPlaceholder(String(DEFAULT_PATH_WIDTH))
+				.setValue(entry.width !== undefined ? String(entry.width) : "")
+				.onChange((v) => {
+					const width = v.trim() ? Number(v) : undefined;
+					if (width !== undefined && (!Number.isFinite(width) || width <= 0))
+						return;
+					entry.width = width;
 					updatePreview();
 					void this.plugin.saveSettings();
 				}),
-			);
-
-		new Setting(contentEl)
-			.setName("Width")
-			.addText((text) =>
-				text
-					.setPlaceholder(String(DEFAULT_PATH_WIDTH))
-					.setValue(entry.width !== undefined ? String(entry.width) : "")
-					.onChange((v) => {
-						const width = v.trim() ? Number(v) : undefined;
-						if (width !== undefined && (!Number.isFinite(width) || width <= 0)) return;
-						entry.width = width;
-						updatePreview();
-						void this.plugin.saveSettings();
-					}),
-			);
+		);
 
 		new Setting(contentEl).setName("Dash").addDropdown((dropdown) => {
 			dropdown.addOption("", "default");
@@ -399,6 +446,11 @@ class PathEntryModal extends Modal {
 						this.close();
 					}),
 			)
-			.addButton((btn) => btn.setButtonText("Done").setCta().onClick(() => this.close()));
+			.addButton((btn) =>
+				btn
+					.setButtonText("Done")
+					.setCta()
+					.onClick(() => this.close()),
+			);
 	}
 }

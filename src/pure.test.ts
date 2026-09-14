@@ -13,11 +13,21 @@ import {
 import type { HexNoteData, Palette } from "./types";
 
 describe("resolvePaletteEntry", () => {
-	const palette: Palette = { terrain: { forest: { color: "green", icon: "tree" } }, paths: {} };
-	const note = (terrain?: string): HexNoteData => ({ path: "p", name: "n", terrain });
+	const palette: Palette = {
+		terrain: { forest: { color: "green", icon: "tree" } },
+		paths: {},
+	};
+	const note = (terrain?: string): HexNoteData => ({
+		path: "p",
+		name: "n",
+		terrain,
+	});
 
 	it("looks up the note's terrain in the palette", () => {
-		expect(resolvePaletteEntry(note("forest"), palette)).toEqual({ color: "green", icon: "tree" });
+		expect(resolvePaletteEntry(note("forest"), palette)).toEqual({
+			color: "green",
+			icon: "tree",
+		});
 	});
 
 	it("returns undefined when the note has no terrain", () => {
@@ -52,26 +62,39 @@ describe("resolveNamedPalette", () => {
 	});
 
 	it("returns undefined when the default itself is missing", () => {
-		expect(resolveNamedPalette(undefined, { palettes: {}, defaultPalette: "gone" })).toBeUndefined();
+		expect(
+			resolveNamedPalette(undefined, { palettes: {}, defaultPalette: "gone" }),
+		).toBeUndefined();
 	});
 });
 
 describe("resolveIconsFolder", () => {
 	it("returns the palette's own icons folder", () => {
-		expect(resolveIconsFolder({ palette: { terrain: {}, paths: {}, iconsFolder: "Palette/Icons" } })).toBe(
-			"Palette/Icons",
-		);
+		expect(
+			resolveIconsFolder({
+				palette: { terrain: {}, paths: {}, iconsFolder: "Palette/Icons" },
+			}),
+		).toBe("Palette/Icons");
 	});
 
 	it("returns undefined when neither is set", () => {
 		expect(resolveIconsFolder({})).toBeUndefined();
-		expect(resolveIconsFolder({ palette: { terrain: {}, paths: {} } })).toBeUndefined();
+		expect(
+			resolveIconsFolder({ palette: { terrain: {}, paths: {} } }),
+		).toBeUndefined();
 	});
 });
 
 describe("parseHexNoteFrontmatter", () => {
 	it("parses valid q/r plus terrain/icon", () => {
-		expect(parseHexNoteFrontmatter({ "hex-q": 2, "hex-r": 3, "hex-terrain": "forest", "hex-icon": " tree " })).toEqual({
+		expect(
+			parseHexNoteFrontmatter({
+				"hex-q": 2,
+				"hex-r": 3,
+				"hex-terrain": "forest",
+				"hex-icon": " tree ",
+			}),
+		).toEqual({
 			q: 2,
 			r: 3,
 			terrain: "forest",
@@ -82,11 +105,20 @@ describe("parseHexNoteFrontmatter", () => {
 	it("rejects missing or non-integer q/r", () => {
 		expect(parseHexNoteFrontmatter({ "hex-r": 3 })).toBeNull();
 		expect(parseHexNoteFrontmatter({ "hex-q": 1.5, "hex-r": 3 })).toBeNull();
-		expect(parseHexNoteFrontmatter({ "hex-q": "not a number", "hex-r": 3 })).toBeNull();
+		expect(
+			parseHexNoteFrontmatter({ "hex-q": "not a number", "hex-r": 3 }),
+		).toBeNull();
 	});
 
 	it("coerces blank/non-string terrain and icon to undefined", () => {
-		expect(parseHexNoteFrontmatter({ "hex-q": 0, "hex-r": 0, "hex-terrain": "  ", "hex-icon": 42 })).toEqual({
+		expect(
+			parseHexNoteFrontmatter({
+				"hex-q": 0,
+				"hex-r": 0,
+				"hex-terrain": "  ",
+				"hex-icon": 42,
+			}),
+		).toEqual({
 			q: 0,
 			r: 0,
 			terrain: undefined,
@@ -99,20 +131,33 @@ describe("parsePathFrontmatter", () => {
 	it("parses valid path-hexes plus type/spline", () => {
 		expect(
 			parsePathFrontmatter({
-				"path-hexes": [[0, 0], [1, 0], [1, 1]],
+				"path-hexes": [
+					[0, 0],
+					[1, 0],
+					[1, 1],
+				],
 				"path-type": "road",
 				"path-spline": true,
 			}),
 		).toEqual({
-			hexes: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 1, r: 1 }],
+			hexes: [
+				{ q: 0, r: 0 },
+				{ q: 1, r: 0 },
+				{ q: 1, r: 1 },
+			],
 			type: "road",
 			spline: true,
 		});
 	});
 
 	it("filters out malformed pairs", () => {
-		expect(parsePathFrontmatter({ "path-hexes": [[0, 0], "bad", [1, 0], [1]] })).toEqual({
-			hexes: [{ q: 0, r: 0 }, { q: 1, r: 0 }],
+		expect(
+			parsePathFrontmatter({ "path-hexes": [[0, 0], "bad", [1, 0], [1]] }),
+		).toEqual({
+			hexes: [
+				{ q: 0, r: 0 },
+				{ q: 1, r: 0 },
+			],
 			type: undefined,
 			spline: undefined,
 		});
@@ -140,7 +185,9 @@ describe("dashArray", () => {
 
 describe("uniqueFileName", () => {
 	it("sanitizes special characters", () => {
-		expect(uniqueFileName('a/b:c*d?e"f<g>h|i', () => false)).toBe("a-b-c-d-e-f-g-h-i");
+		expect(uniqueFileName('a/b:c*d?e"f<g>h|i', () => false)).toBe(
+			"a-b-c-d-e-f-g-h-i",
+		);
 	});
 
 	it("falls back to 'Path' for a blank name", () => {
@@ -153,7 +200,9 @@ describe("uniqueFileName", () => {
 
 	it("suffixes ' 2', ' 3', ... until a free name is found", () => {
 		const taken = new Set(["Road", "Road 2", "Road 3"]);
-		expect(uniqueFileName("Road", (candidate) => taken.has(candidate))).toBe("Road 4");
+		expect(uniqueFileName("Road", (candidate) => taken.has(candidate))).toBe(
+			"Road 4",
+		);
 	});
 });
 
@@ -179,6 +228,8 @@ describe("uniqueKey", () => {
 	});
 
 	it("suffixes ' 2', ' 3', ... until a free key is found", () => {
-		expect(uniqueKey({ Terrain: 1, "Terrain 2": 1 }, "Terrain")).toBe("Terrain 3");
+		expect(uniqueKey({ Terrain: 1, "Terrain 2": 1 }, "Terrain")).toBe(
+			"Terrain 3",
+		);
 	});
 });

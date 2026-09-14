@@ -1,6 +1,8 @@
-# Hexcrawl
+# Obsidian Hexcrawl
 
 Turn a folder of notes into a fully interactive, easily editable hex map. Drop a `hexcrawl` code block into any note, point it at a folder, and every note with `hex-q`/`hex-r` frontmatter becomes a hex on the map. The map itself isn't a static picture: paint terrain, drop icons, and draw paths straight onto it with the built-in toolbar.
+
+![Example hexcrawl](screenshot.png)
 
 ## Features
 
@@ -26,8 +28,8 @@ And a hex note anywhere in that folder:
 
 ```yaml
 ---
-hex-q: 3       # column (0-based)
-hex-r: 2       # row (0-based)
+hex-q: 3 # column (0-based)
+hex-r: 2 # row (0-based)
 hex-terrain: forest
 ---
 ```
@@ -37,8 +39,17 @@ hex-terrain: forest
 Not yet on the community plugin store. To install manually:
 
 1. Build the plugin (see [Development](#development)).
-2. Copy `main.js`, `manifest.json`, and `styles.css` to `<vault>/.obsidian/plugins/obsidian-hexcrawl/`.
+2. Copy `main.js`, `manifest.json`, `styles.css`, and `icons/` to `<vault>/.obsidian/plugins/obsidian-hexcrawl/` (or just make a soft link).
 3. Enable **Hexcrawl** under Settings → Community plugins.
+
+## Alternatives & Inspiration
+
+- Alex Schroeder's [Text Mapper](https://src.alexschroeder.ch/text-mapper.git/) and its [port for Obsidian](https://github.com/modality/obsidian-text-mapper).
+- [Hexmap World Creator](https://github.com/sbuffkin/hexmaker) for Obsidian (`obsidian-hexcrawl` aims to achieve the same results with a bit more straightforward and flexible approach).
+- [The Great Antarctic Hexcrawl pt. 9](https://idraluna-archives.bearblog.dev/the-great-antarctic-hexcrawl-pt-9-cartography-naming-stuff-diversifying-regions-markdown/).
+- [Hexagonal Grids](https://www.redblobgames.com/) by Amit Patel.
+
+This plugin uses the Gnomeyland icons pack by Gregory B. MacKenzie for the default terrain palette (see [Palettes](#palettes)). The Gnomeyland icons are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/).
 
 ## Reference
 
@@ -46,13 +57,13 @@ Not yet on the community plugin store. To install manually:
 
 A toolbar pinned to the top-right corner of every rendered map lets you edit it directly, with no frontmatter to hand-write:
 
-| Tool | What it does |
-|------|--------------|
-| Brush | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it. |
-| Bucket | Flood-fill connected same-terrain hexes with a new one. |
-| Icon | Drop an icon from the palette's icon folder onto a hex, or erase it. |
-| Path | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points. |
-| Layers | Toggle terrain, icons, and paths on or off independently. |
+| Tool   | What it does                                                                                                    |
+| ------ | --------------------------------------------------------------------------------------------------------------- |
+| Brush  | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it.                                      |
+| Bucket | Flood-fill connected same-terrain hexes with a new one.                                                         |
+| Icon   | Drop an icon from the palette's icon folder onto a hex, or erase it.                                            |
+| Path   | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points. |
+| Layers | Toggle terrain, icons, and paths on or off independently.                                                       |
 
 Every change is written straight to the affected note's frontmatter (or creates a new path note), so the map and the notes never drift apart.
 
@@ -70,9 +81,12 @@ Every change is written straight to the affected note's frontmatter (or creates 
 | `coords`      | no       | `false`                | Show q/r coordinate labels along the top and left axes.                                                                |
 | `palette`     | no       | default global palette | Name of a global palette (e.g. `palette: Wikipedia`), or an inline mapping for a one-off palette scoped to this block. |
 | `paths`       | no       | —                      | Vault-relative path to a folder of path notes (roads, rivers, ...).                                                    |
+
 ### Palettes
 
-Manage named palettes vault-wide from Settings → Hexcrawl — add, duplicate, delete, mark a default, and edit each one's terrain/path entries and icons folder (with a picker and live preview). A block picks one with `palette: <name>`, or omits it to use the default.
+Manage named palettes vault-wide from Settings → Hexcrawl. Add, duplicate, delete, mark a default, and edit each one's terrain/path entries and icons folder (with a picker and live preview).
+
+A `hexcrawl` block picks one with `palette: <name>`, or omits it to use the default.
 
 The same shape also works inline, scoped to a single block:
 
@@ -95,17 +109,17 @@ palette:
       spline: true
 ```
 
-| Terrain key | Required | Description |
-|-------------|----------|-------------|
-| `color`     | no       | Hex fill color. |
+| Terrain key | Required | Description                                                                 |
+| ----------- | -------- | --------------------------------------------------------------------------- |
+| `color`     | no       | Hex fill color.                                                             |
 | `icon`      | no       | Filename basename (no extension) looked up in the palette's `icons` folder. |
 
-| Path key | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `color`  | no       | `var(--text-muted)` | Stroke color. |
-| `width`  | no       | `3`     | Stroke width in pixels. |
-| `dash`   | no       | `solid` | `solid`, `dashed`, or `dotted`. |
-| `spline` | no       | `false` | Smooth curve vs. straight segments, unless a note overrides it. |
+| Path key | Required | Default             | Description                                                     |
+| -------- | -------- | ------------------- | --------------------------------------------------------------- |
+| `color`  | no       | `var(--text-muted)` | Stroke color.                                                   |
+| `width`  | no       | `3`                 | Stroke width in pixels.                                         |
+| `dash`   | no       | `solid`             | `solid`, `dashed`, or `dotted`.                                 |
+| `spline` | no       | `false`             | Smooth curve vs. straight segments, unless a note overrides it. |
 
 `hex-icon` on a note always wins over the palette's icon. A `hex-terrain` or `path-type` with no palette match falls back to being used directly as a CSS color.
 
@@ -120,7 +134,7 @@ palette:
 
 A note missing or non-integer `hex-q`/`hex-r` is ignored.
 
-### Paths (roads, rivers, barriers, ...)
+### Paths (roads, rivers, etc)
 
 Each path is its own note in the block's `paths` folder. The note's title doubles as its name unless `path-name` is set:
 
@@ -145,11 +159,15 @@ path-spline: true
 
 ```bash
 npm install
-npm run dev     # watch build
-npm run build   # production build (type-checks first)
-npm test        # run unit tests
+npm run dev            # watch build
+npm run build          # production build (type-checks first)
+npm test               # run unit tests
+npm run lint           # eslint
+npm run format:check   # prettier --check
 ```
 
-## License
+Install the [pre-commit](https://pre-commit.com/) hook once per clone so typecheck/lint/format issues are caught before you push (same checks CI runs):
 
-MIT
+```bash
+pre-commit install
+```

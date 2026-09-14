@@ -1,7 +1,7 @@
-import { App, TFile } from "obsidian";
+import { App } from "obsidian";
 import type { HexcrawlBlockParams, HexNoteData } from "./types";
 import { hexCenter, hexSize } from "./hexGeometry";
-import { loadIconFiles } from "./dataLoaders";
+import { loadIcons } from "./dataLoaders";
 import { resolvePaletteEntry } from "./pure";
 
 const ICON_SCALE = 0.9;
@@ -10,7 +10,7 @@ const ICON_SCALE = 0.9;
 export class IconsLayer {
 	private el: HTMLElement | null = null;
 	private iconElements = new Map<string, HTMLImageElement>();
-	private iconFiles: Map<string, TFile> | undefined;
+	private iconSrcs: Map<string, string> | undefined;
 	private gutter = 0;
 	private visible = true;
 
@@ -19,8 +19,10 @@ export class IconsLayer {
 		private params: HexcrawlBlockParams,
 	) {}
 
-	load(iconsFolder: string | undefined): void {
-		this.iconFiles = iconsFolder ? loadIconFiles(this.app, iconsFolder) : undefined;
+	async load(iconsFolder: string | undefined): Promise<void> {
+		this.iconSrcs = iconsFolder
+			? await loadIcons(this.app, iconsFolder)
+			: undefined;
 	}
 
 	/**
@@ -28,8 +30,13 @@ export class IconsLayer {
 	 * so without a declared size it collapses to shrink-to-fit-of-nothing (0×0) — which some themes'
 	 * global `img { max-width: 100% }` rules then clamp every icon `<img>` down to (0% of 0).
 	 */
-	mount(viewportEl: HTMLElement, totalSize: { width: number; height: number }): void {
-		this.el = viewportEl.createDiv({ cls: ["hexcrawl-layer", "hexcrawl-layer-icons"] });
+	mount(
+		viewportEl: HTMLElement,
+		totalSize: { width: number; height: number },
+	): void {
+		this.el = viewportEl.createDiv({
+			cls: ["hexcrawl-layer", "hexcrawl-layer-icons"],
+		});
 		this.el.style.width = `${totalSize.width}px`;
 		this.el.style.height = `${totalSize.height}px`;
 		this.el.style.display = this.visible ? "" : "none";
@@ -47,17 +54,32 @@ export class IconsLayer {
 	render(hexNotes: Map<string, HexNoteData>, gutter: number): void {
 		if (!this.el) return;
 		this.gutter = gutter;
-		const { orientation, stagger, hexSize: radius, cols, rows, palette } = this.params;
+		const {
+			orientation,
+			stagger,
+			hexSize: radius,
+			cols,
+			rows,
+			palette,
+		} = this.params;
 		const { w: hexW, h: hexH } = hexSize(radius, orientation);
 
 		for (let r = 0; r < rows; r++) {
 			for (let q = 0; q < cols; q++) {
 				const note = hexNotes.get(`${q},${r}`);
 				const iconName = note?.icon ?? resolvePaletteEntry(note, palette)?.icon;
-				const iconFile = iconName ? this.iconFiles?.get(iconName) : undefined;
-				if (!iconFile) continue;
+				const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
+				if (!iconSrc) continue;
 				const center = hexCenter(q, r, orientation, radius, stagger);
-				this.placeIcon(`${q},${r}`, iconFile, iconName!, gutter + center.cx, gutter + center.cy, hexW, hexH);
+				this.placeIcon(
+					`${q},${r}`,
+					iconSrc,
+					iconName!,
+					gutter + center.cx,
+					gutter + center.cy,
+					hexW,
+					hexH,
+				);
 			}
 		}
 	}
@@ -68,13 +90,21 @@ export class IconsLayer {
 		const key = `${q},${r}`;
 		const { orientation, stagger, hexSize: radius, palette } = this.params;
 		const iconName = note.icon ?? resolvePaletteEntry(note, palette)?.icon;
-		const iconFile = iconName ? this.iconFiles?.get(iconName) : undefined;
+		const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
 		const iconEl = this.iconElements.get(key);
 
-		if (iconFile) {
+		if (iconSrc) {
 			const center = hexCenter(q, r, orientation, radius, stagger);
 			const { w: hexW, h: hexH } = hexSize(radius, orientation);
-			this.placeIcon(key, iconFile, iconName!, this.gutter + center.cx, this.gutter + center.cy, hexW, hexH);
+			this.placeIcon(
+				key,
+				iconSrc,
+				iconName!,
+				this.gutter + center.cx,
+				this.gutter + center.cy,
+				hexW,
+				hexH,
+			);
 		} else if (iconEl) {
 			iconEl.remove();
 			this.iconElements.delete(key);
@@ -83,7 +113,7 @@ export class IconsLayer {
 
 	private placeIcon(
 		key: string,
-		file: TFile,
+		src: string,
 		alt: string,
 		cx: number,
 		cy: number,
@@ -105,7 +135,7 @@ export class IconsLayer {
 			iconEl.style.top = `${cy - iconH / 2}px`;
 			this.iconElements.set(key, iconEl);
 		}
-		iconEl.src = this.app.vault.getResourcePath(file);
+		iconEl.src = src;
 		iconEl.alt = alt;
 	}
 }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { gridBoundingBox, hexCenter, hexNeighbors, hexSize, sharpPath, smoothPath } from "./hexGeometry";
+import {
+	gridBoundingBox,
+	hexCenter,
+	hexNeighbors,
+	hexSize,
+	sharpPath,
+	smoothPath,
+} from "./hexGeometry";
 
 describe("hexSize", () => {
 	it("flat-top: width is 2R, height is √3·R", () => {

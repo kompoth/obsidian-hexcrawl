@@ -1,0 +1,20 @@
+repos:
+  - repo: local
+    hooks:
+      - id: typecheck
+        name: typecheck
+        entry: npm run typecheck
+        language: system
+        pass_filenames: false
+
+      - id: lint
+        name: eslint
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+
+      - id: format-check
+        name: prettier format check
+        entry: npm run format:check
+        language: system
+        pass_filenames: false
