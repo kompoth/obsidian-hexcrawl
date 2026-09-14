@@ -286,10 +286,13 @@ export class HexMapRenderer {
 		if (existing) {
 			const file = this.app.vault.getAbstractFileByPath(existing.path);
 			if (!(file instanceof TFile)) return;
-			await this.app.fileManager.processFrontMatter(file, (fm) => {
-				if (value === undefined) delete fm[field];
-				else fm[field] = value;
-			});
+			await this.app.fileManager.processFrontMatter(
+				file,
+				(fm: Record<string, unknown>) => {
+					if (value === undefined) delete fm[field];
+					else fm[field] = value;
+				},
+			);
 			const updated: HexNoteData = {
 				...existing,
 				terrain: field === "hex-terrain" ? value : existing.terrain,

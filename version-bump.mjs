@@ -12,5 +12,3 @@ writeFileSync(manifestPath, JSON.stringify(manifest, null, "\t"));
 const versions = JSON.parse(readFileSync(versionsPath, "utf8"));
 versions[targetVersion] = manifest.minAppVersion;
 writeFileSync(versionsPath, JSON.stringify(versions, null, "\t"));
-
-console.log("Bumped version to", targetVersion);

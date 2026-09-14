@@ -304,17 +304,15 @@ class TerrainEntryModal extends Modal {
 			});
 
 		new Setting(contentEl)
-			.addButton((btn) =>
-				btn
-					.setButtonText("Delete")
-					.setDestructive()
-					.onClick(() => {
-						delete palette.terrain[this.key];
-						void this.plugin.saveSettings();
-						this.pendingKey = this.key;
-						this.close();
-					}),
-			)
+			.addButton((btn) => {
+				btn.buttonEl.addClass("mod-warning");
+				btn.setButtonText("Delete").onClick(() => {
+					delete palette.terrain[this.key];
+					void this.plugin.saveSettings();
+					this.pendingKey = this.key;
+					this.close();
+				});
+			})
 			.addButton((btn) =>
 				btn
 					.setButtonText("Done")
@@ -435,17 +433,15 @@ class PathEntryModal extends Modal {
 			);
 
 		new Setting(contentEl)
-			.addButton((btn) =>
-				btn
-					.setButtonText("Delete")
-					.setDestructive()
-					.onClick(() => {
-						delete palette.paths[this.key];
-						void this.plugin.saveSettings();
-						this.pendingKey = this.key;
-						this.close();
-					}),
-			)
+			.addButton((btn) => {
+				btn.buttonEl.addClass("mod-warning");
+				btn.setButtonText("Delete").onClick(() => {
+					delete palette.paths[this.key];
+					void this.plugin.saveSettings();
+					this.pendingKey = this.key;
+					this.close();
+				});
+			})
 			.addButton((btn) =>
 				btn
 					.setButtonText("Done")

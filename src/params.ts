@@ -1,11 +1,5 @@
 import { parseYaml } from "obsidian";
-import type {
-	HexcrawlBlockParams,
-	HexOrientation,
-	Palette,
-	PathDashStyle,
-	StaggerOffset,
-} from "./types";
+import type { HexcrawlBlockParams, Palette, PathDashStyle } from "./types";
 
 const DASH_STYLES: PathDashStyle[] = ["solid", "dashed", "dotted"];
 
@@ -51,7 +45,7 @@ export function parseHexcrawlParams(
 			error: `Invalid orientation "${String(params.orientation)}" — expected "pointy" or "flat".`,
 		};
 	}
-	const orientation = orientationRaw as HexOrientation;
+	const orientation = orientationRaw;
 
 	const staggerRaw =
 		typeof params.stagger === "string" ? params.stagger.toLowerCase() : "odd";
@@ -61,7 +55,7 @@ export function parseHexcrawlParams(
 			error: `Invalid stagger "${String(params.stagger)}" — expected "odd" or "even".`,
 		};
 	}
-	const stagger = staggerRaw as StaggerOffset;
+	const stagger = staggerRaw;
 
 	const cols = Number(params.cols);
 	if (!Number.isInteger(cols) || cols <= 0) {

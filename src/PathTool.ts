@@ -562,8 +562,11 @@ export class PathTool {
 	private async savePathHexes(path: PathData): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(path.notePath);
 		if (!(file instanceof TFile)) return;
-		await this.app.fileManager.processFrontMatter(file, (fm) => {
-			fm["path-hexes"] = path.hexes.map((h) => [h.q, h.r]);
-		});
+		await this.app.fileManager.processFrontMatter(
+			file,
+			(fm: Record<string, unknown>) => {
+				fm["path-hexes"] = path.hexes.map((h) => [h.q, h.r]);
+			},
+		);
 	}
 }
