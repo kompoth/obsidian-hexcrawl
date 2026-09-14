@@ -1,7 +1,7 @@
 import { App } from "obsidian";
 import type { HexcrawlBlockParams, HexNoteData } from "./types";
 import { hexCenter, hexKey, hexSize } from "./hexGeometry";
-import { loadIcons } from "./dataLoaders";
+import { resolveIcons } from "./dataLoaders";
 import { resolveIconName } from "./pure";
 
 const ICON_SCALE = 0.9;
@@ -10,7 +10,7 @@ const ICON_SCALE = 0.9;
 export class IconsLayer {
 	private el: HTMLElement | null = null;
 	private iconElements = new Map<string, HTMLImageElement>();
-	private iconSrcs: Map<string, string> | undefined;
+	private iconSrcs: Map<string, string> = new Map();
 	private gutter = 0;
 	private visible = true;
 
@@ -20,9 +20,7 @@ export class IconsLayer {
 	) {}
 
 	async load(iconsFolder: string | undefined): Promise<void> {
-		this.iconSrcs = iconsFolder
-			? await loadIcons(this.app, iconsFolder)
-			: undefined;
+		this.iconSrcs = await resolveIcons(this.app, iconsFolder);
 	}
 
 	/**
@@ -71,7 +69,7 @@ export class IconsLayer {
 				const note = hexNotes.get(key);
 				const iconName = resolveIconName(note, palette);
 				if (!iconName) continue;
-				const iconSrc = this.iconSrcs?.get(iconName);
+				const iconSrc = this.iconSrcs.get(iconName);
 				if (!iconSrc) continue;
 				const center = hexCenter(q, r, orientation, radius, stagger);
 				this.placeIcon(
@@ -95,7 +93,7 @@ export class IconsLayer {
 		const key = hexKey(q, r);
 		const { orientation, stagger, hexSize: radius, palette } = this.params;
 		const iconName = resolveIconName(note, palette);
-		const iconSrc = iconName ? this.iconSrcs?.get(iconName) : undefined;
+		const iconSrc = iconName ? this.iconSrcs.get(iconName) : undefined;
 		const iconEl = this.iconElements.get(key);
 
 		if (iconName && iconSrc) {

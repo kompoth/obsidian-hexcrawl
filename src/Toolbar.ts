@@ -1,6 +1,6 @@
 import { App, setIcon, setTooltip } from "obsidian";
 import type { HexcrawlBlockParams } from "./types";
-import { loadIcons } from "./dataLoaders";
+import { resolveIcons } from "./dataLoaders";
 import { resolveIconsFolder } from "./pure";
 
 export type ToolKind = "brush" | "bucket" | "icon" | "path" | "layers";
@@ -220,9 +220,7 @@ export class Toolbar {
 			return;
 		}
 		const iconsFolder = resolveIconsFolder(this.params);
-		const iconSrcs = iconsFolder
-			? await loadIcons(this.app, iconsFolder)
-			: undefined;
+		const iconSrcs = await resolveIcons(this.app, iconsFolder);
 		if (renderId !== this.drawerRenderId) return;
 		for (const name of names) {
 			const entry = terrain[name];
@@ -231,7 +229,7 @@ export class Toolbar {
 			});
 			if (entry.color) previewEl.style.backgroundColor = entry.color;
 			if (entry.icon) {
-				const iconSrc = iconSrcs?.get(entry.icon);
+				const iconSrc = iconSrcs.get(entry.icon);
 				if (iconSrc) addDrawerPreviewImage(previewEl, iconSrc, entry.icon);
 			}
 		}
@@ -242,11 +240,7 @@ export class Toolbar {
 		renderId: number,
 	): Promise<void> {
 		const iconsFolder = resolveIconsFolder(this.params);
-		if (!iconsFolder) {
-			renderDrawerEmpty(scrollEl, "No icons folder configured");
-			return;
-		}
-		const iconSrcs = await loadIcons(this.app, iconsFolder);
+		const iconSrcs = await resolveIcons(this.app, iconsFolder);
 		if (renderId !== this.drawerRenderId) return;
 		const sortedIcons = [...iconSrcs].sort(([a], [b]) => a.localeCompare(b));
 		if (sortedIcons.length === 0) {

@@ -1,6 +1,6 @@
 import { App, debounce, Modal, Notice, Setting } from "obsidian";
 import type HexcrawlPlugin from "../main";
-import { loadIcons } from "./dataLoaders";
+import { resolveIcons } from "./dataLoaders";
 import { applyPathPreviewStyle, DEFAULT_PATH_WIDTH } from "./PathTool";
 import { renameKey, uniqueKey } from "./pure";
 import type {
@@ -76,7 +76,9 @@ export class PaletteEditModal extends Modal {
 		);
 		new Setting(contentEl)
 			.setName("Icons folder")
-			.setDesc("Vault-relative folder icon names below are looked up in.")
+			.setDesc(
+				"Vault-relative folder icon names below are looked up in. Leave empty to use the plugin's bundled icon pack instead — the two are never combined.",
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("e.g. TTRPG/Icons")
@@ -132,9 +134,7 @@ export class PaletteEditModal extends Modal {
 		el.empty();
 		const renderId = ++this.terrainRenderId;
 		const palette = this.palette;
-		const iconSrcs = palette.iconsFolder
-			? await loadIcons(this.app, palette.iconsFolder)
-			: new Map<string, string>();
+		const iconSrcs = await resolveIcons(this.app, palette.iconsFolder);
 		if (renderId !== this.terrainRenderId) return;
 
 		for (const key of Object.keys(palette.terrain)) {
@@ -303,9 +303,7 @@ class TerrainEntryModal extends PaletteEntryModal<TerrainPaletteEntry> {
 		contentEl.empty();
 		const palette = this.palette;
 		const entry = palette.terrain[this.key];
-		const iconSrcs = palette.iconsFolder
-			? await loadIcons(this.app, palette.iconsFolder)
-			: new Map<string, string>();
+		const iconSrcs = await resolveIcons(this.app, palette.iconsFolder);
 		if (this.closed) return;
 
 		const previewEl = contentEl.createDiv({ cls: "hexcrawl-settings-preview" });
@@ -334,28 +332,20 @@ class TerrainEntryModal extends PaletteEntryModal<TerrainPaletteEntry> {
 			}),
 		);
 
-		new Setting(contentEl)
-			.setName("Icon")
-			.setDesc(
-				palette.iconsFolder
-					? ""
-					: "Set the palette's icons folder above to pick an icon.",
-			)
-			.addDropdown((dropdown) => {
-				dropdown.addOption("", "No icon");
-				for (const iconName of [...iconSrcs.keys()].sort())
-					dropdown.addOption(iconName, iconName);
-				if (entry.icon && !iconSrcs.has(entry.icon)) {
-					dropdown.addOption(entry.icon, `${entry.icon} (missing)`);
-				}
-				dropdown.setValue(entry.icon ?? "");
-				dropdown.setDisabled(!palette.iconsFolder);
-				dropdown.onChange((v) => {
-					entry.icon = v || undefined;
-					updatePreview();
-					void this.plugin.saveSettings();
-				});
+		new Setting(contentEl).setName("Icon").addDropdown((dropdown) => {
+			dropdown.addOption("", "No icon");
+			for (const iconName of [...iconSrcs.keys()].sort())
+				dropdown.addOption(iconName, iconName);
+			if (entry.icon && !iconSrcs.has(entry.icon)) {
+				dropdown.addOption(entry.icon, `${entry.icon} (missing)`);
+			}
+			dropdown.setValue(entry.icon ?? "");
+			dropdown.onChange((v) => {
+				entry.icon = v || undefined;
+				updatePreview();
+				void this.plugin.saveSettings();
 			});
+		});
 
 		this.addDeleteDoneButtons(
 			contentEl,

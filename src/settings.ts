@@ -9,11 +9,7 @@ export interface HexcrawlSettings {
 
 export const DEFAULT_PALETTE_NAME = "Text Mapper";
 
-/** `iconsFolder` for the bundled palette below — the plugin's own installed `icons/` folder,
- *  passed in by main.ts since it depends on where this install of the plugin actually lives. */
-export function getDefaultSettings(
-	builtinIconsFolder: string | undefined,
-): HexcrawlSettings {
+export function getDefaultSettings(): HexcrawlSettings {
 	// Terrain/path colors are the named fills from the Text Mapper/Gnomeyland DSL itself
 	// (campaignwiki.org/text-mapper's gnomeyland.txt) rather than invented hex values —
 	// picked per its own "suitable for X" grouping comments.
@@ -33,7 +29,6 @@ export function getDefaultSettings(
 			trail: { color: "#000000", width: 3, dash: "dashed" },
 			seaway: { color: "#ffffff", width: 3, dash: "dashed", spline: true },
 		},
-		iconsFolder: builtinIconsFolder,
 	};
 	return {
 		palettes: { [DEFAULT_PALETTE_NAME]: defaultPalette },

@@ -39,7 +39,7 @@ hex-terrain: forest
 Not yet on the community plugin store. To install manually:
 
 1. Build the plugin (see [Development](#development)).
-2. Copy `main.js`, `manifest.json`, `styles.css`, and `icons/` to `<vault>/.obsidian/plugins/obsidian-hexcrawl/` (or just make a soft link).
+2. Copy `main.js`, `manifest.json`, and `styles.css` to `<vault>/.obsidian/plugins/obsidian-hexcrawl/` (or just make a soft link).
 3. Enable **Hexcrawl** under Settings → Community plugins.
 
 ## Alternatives & Inspiration
@@ -84,7 +84,7 @@ Every change is written straight to the affected note's frontmatter (or creates 
 
 ### Palettes
 
-Manage named palettes vault-wide from Settings → Hexcrawl. Add, duplicate, delete, mark a default, and edit each one's terrain/path entries and icons folder (with a picker and live preview).
+Manage named palettes vault-wide from Settings → Hexcrawl. Add, duplicate, delete, mark a default, and edit each one's terrain/path entries and icons folder (with a picker and live preview). Leave a palette's icons folder empty to use the plugin's bundled icon pack; set one to use only icons from that vault folder instead — the two are never combined.
 
 A `hexcrawl` block picks one with `palette: <name>`, or omits it to use the default.
 
@@ -109,10 +109,10 @@ palette:
       spline: true
 ```
 
-| Terrain key | Required | Description                                                                 |
-| ----------- | -------- | --------------------------------------------------------------------------- |
-| `color`     | no       | Hex fill color.                                                             |
-| `icon`      | no       | Filename basename (no extension) looked up in the palette's `icons` folder. |
+| Terrain key | Required | Description                                                                                                          |
+| ----------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `color`     | no       | Hex fill color.                                                                                                      |
+| `icon`      | no       | Filename basename (no extension) looked up in the palette's `icons` folder, or the bundled icon pack if none is set. |
 
 | Path key | Required | Default             | Description                                                     |
 | -------- | -------- | ------------------- | --------------------------------------------------------------- |
@@ -125,12 +125,12 @@ palette:
 
 ### Hex note frontmatter
 
-| Frontmatter key | Required | Description                                                                                                                                        |
-| --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hex-q`         | yes      | Column coordinate (integer).                                                                                                                       |
-| `hex-r`         | yes      | Row coordinate (integer).                                                                                                                          |
-| `hex-terrain`   | no       | Looked up against the palette's terrain names; falls back to a literal CSS color (e.g. `#4a7c3f`, `green`) if no match. Omit for an uncolored hex. |
-| `hex-icon`      | no       | Icon basename (no extension) from the active palette's icons folder. Overrides the palette's own icon for `hex-terrain`.                           |
+| Frontmatter key | Required | Description                                                                                                                                                    |
+| --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hex-q`         | yes      | Column coordinate (integer).                                                                                                                                   |
+| `hex-r`         | yes      | Row coordinate (integer).                                                                                                                                      |
+| `hex-terrain`   | no       | Looked up against the palette's terrain names; falls back to a literal CSS color (e.g. `#4a7c3f`, `green`) if no match. Omit for an uncolored hex.             |
+| `hex-icon`      | no       | Icon basename (no extension) from the active palette's icons folder (or its bundled pack, if none is set). Overrides the palette's own icon for `hex-terrain`. |
 
 A note missing or non-integer `hex-q`/`hex-r` is ignored.
 

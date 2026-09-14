@@ -1,5 +1,6 @@
 import { App, normalizePath, TFile, TFolder } from "obsidian";
 import type { HexNoteData } from "./types";
+import { BUNDLED_ICONS } from "./bundledIcons";
 import { hexKey } from "./hexGeometry";
 import { parseHexNoteFrontmatter } from "./pure";
 
@@ -29,7 +30,7 @@ export function loadHexNotes(
 /**
  * Icon name -> resolved `<img src>` URL, for a vault-relative folder. Goes through
  * `app.vault.adapter` rather than the `TFile` vault index so this also works for folders
- * outside the indexed vault tree, e.g. a plugin's own bundled `.obsidian/plugins/<id>/icons`.
+ * outside the indexed vault tree.
  */
 export async function loadIcons(
 	app: App,
@@ -66,4 +67,16 @@ export async function loadIcons(
 		}),
 	);
 	return icons;
+}
+
+/**
+ * A palette's effective icon set: the plugin's own bundled pack when no `iconsFolder` is
+ * configured, or *only* that folder's icons when one is — the two are never mixed, so
+ * setting a folder is an explicit opt-out of the bundled pack rather than an addition to it.
+ */
+export async function resolveIcons(
+	app: App,
+	iconsFolder: string | undefined,
+): Promise<Map<string, string>> {
+	return iconsFolder ? loadIcons(app, iconsFolder) : BUNDLED_ICONS;
 }

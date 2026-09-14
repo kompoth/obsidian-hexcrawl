@@ -22,6 +22,7 @@ const context = await esbuild.context({
 	sourcemap: production ? false : "inline",
 	treeShaking: true,
 	outfile: "main.js",
+	loader: { ".svg": "dataurl" },
 });
 
 if (production) {
