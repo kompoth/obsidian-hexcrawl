@@ -1,0 +1,73 @@
+export type HexOrientation = "pointy" | "flat";
+
+/** Which parity of row (pointy-top) or column (flat-top) is the shifted one. */
+export type StaggerOffset = "odd" | "even";
+
+export interface TerrainPaletteEntry {
+	color?: string;
+	/** Icon file basename (without extension), looked up in the block's icons folder. */
+	icon?: string;
+}
+
+export type PathDashStyle = "solid" | "dashed" | "dotted";
+
+export interface PathStyleEntry {
+	color?: string;
+	/** Stroke width in pixels. */
+	width?: number;
+	dash?: PathDashStyle;
+	/** Default rendering method for paths of this type; a note's own path-spline overrides it. */
+	spline?: boolean;
+}
+
+export interface Palette {
+	/** Terrain name (matched against a note's hex-terrain value) -> entry. */
+	terrain: Record<string, TerrainPaletteEntry>;
+	/** Path type (matched against a note's path-type value) -> style. */
+	paths: Record<string, PathStyleEntry>;
+	/** Vault-relative folder icon names (terrain/hex-icon) are looked up in. */
+	iconsFolder?: string;
+}
+
+export interface HexcrawlBlockParams {
+	/** Vault-relative path to the folder containing hex notes. */
+	folder: string;
+	orientation: HexOrientation;
+	stagger: StaggerOffset;
+	/** Hex radius (center to vertex) in pixels. */
+	hexSize: number;
+	cols: number;
+	rows: number;
+	/** Visible map panel height in pixels. */
+	height: number;
+	/** Show q/r coordinate labels along the top and left axes. */
+	showCoords: boolean;
+	/** Vault-relative path to the folder containing path notes (roads, rivers, barriers, ...). */
+	pathsFolder?: string;
+	palette?: Palette;
+}
+
+export interface HexNoteData {
+	path: string;
+	name: string;
+	terrain?: string;
+	/** hex-icon frontmatter value; overrides whatever icon the palette would pick for hex-terrain. */
+	icon?: string;
+}
+
+export interface HexCoord {
+	q: number;
+	r: number;
+}
+
+export interface PathData {
+	/** Vault path of the note this path came from, so clicking it can open that note. */
+	notePath: string;
+	name: string;
+	/** path-type frontmatter value, e.g. "road" | "river" | "barrier". Looked up in palette.paths; also used as a CSS class modifier and, if unmatched, as a literal CSS color (same fallback as hex-terrain). */
+	type?: string;
+	/** Ordered hex centers the path runs through, from path-hexes. */
+	hexes: HexCoord[];
+	/** Render as a smooth spline instead of straight segments; undefined defers to the palette's default for this type. */
+	spline?: boolean;
+}
