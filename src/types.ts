@@ -3,6 +3,9 @@ export type HexOrientation = "pointy" | "flat";
 /** Which parity of row (pointy-top) or column (flat-top) is the shifted one. */
 export type StaggerOffset = "odd" | "even";
 
+/** How hex-gm-icon is rendered: at hex center like a regular icon, or small in a corner. */
+export type GmIconMode = "default" | "mini";
+
 export interface TerrainPaletteEntry {
 	color?: string;
 	/** Icon file basename (without extension), looked up in the block's icons folder. */
@@ -45,6 +48,8 @@ export interface HexcrawlBlockParams {
 	/** Vault-relative path to the folder containing path notes (roads, rivers, barriers, ...). */
 	pathsFolder?: string;
 	palette?: Palette;
+	/** How hex-gm-icon is rendered on its own visibility layer, above everything else. */
+	gmIconMode: GmIconMode;
 }
 
 export interface HexNoteData {
@@ -53,6 +58,8 @@ export interface HexNoteData {
 	terrain?: string;
 	/** hex-icon frontmatter value; overrides whatever icon the palette would pick for hex-terrain. */
 	icon?: string;
+	/** hex-gm-icon frontmatter value, rendered on the GM-only icon layer. */
+	gmIcon?: string;
 }
 
 export interface HexCoord {

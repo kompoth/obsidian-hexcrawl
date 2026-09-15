@@ -5,19 +5,21 @@ import {
 } from "../src/frontmatter";
 
 describe("parseHexNoteFrontmatter", () => {
-	it("parses valid q/r plus terrain/icon", () => {
+	it("parses valid q/r plus terrain/icon/gm-icon", () => {
 		expect(
 			parseHexNoteFrontmatter({
 				"hex-q": 2,
 				"hex-r": 3,
 				"hex-terrain": "forest",
 				"hex-icon": " tree ",
+				"hex-gm-icon": " secret-lair ",
 			}),
 		).toEqual({
 			q: 2,
 			r: 3,
 			terrain: "forest",
 			icon: "tree",
+			gmIcon: "secret-lair",
 		});
 	});
 
@@ -29,19 +31,21 @@ describe("parseHexNoteFrontmatter", () => {
 		).toBeNull();
 	});
 
-	it("coerces blank/non-string terrain and icon to undefined", () => {
+	it("coerces blank/non-string terrain, icon, and gm-icon to undefined", () => {
 		expect(
 			parseHexNoteFrontmatter({
 				"hex-q": 0,
 				"hex-r": 0,
 				"hex-terrain": "  ",
 				"hex-icon": 42,
+				"hex-gm-icon": "  ",
 			}),
 		).toEqual({
 			q: 0,
 			r: 0,
 			terrain: undefined,
 			icon: undefined,
+			gmIcon: undefined,
 		});
 	});
 });

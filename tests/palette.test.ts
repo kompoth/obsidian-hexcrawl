@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	resolveGmIconName,
 	resolveIconsFolder,
 	resolveNamedPalette,
 	resolvePaletteEntry,
@@ -59,6 +60,26 @@ describe("resolveNamedPalette", () => {
 		expect(
 			resolveNamedPalette(undefined, { palettes: {}, defaultPalette: "gone" }),
 		).toBeUndefined();
+	});
+});
+
+describe("resolveGmIconName", () => {
+	const note = (gmIcon?: string): HexNoteData => ({
+		path: "p",
+		name: "n",
+		gmIcon,
+	});
+
+	it("returns the note's own hex-gm-icon value", () => {
+		expect(resolveGmIconName(note("secret-lair"))).toBe("secret-lair");
+	});
+
+	it("returns undefined when the note has no hex-gm-icon", () => {
+		expect(resolveGmIconName(note())).toBeUndefined();
+	});
+
+	it("returns undefined for an undefined note", () => {
+		expect(resolveGmIconName(undefined)).toBeUndefined();
 	});
 });
 

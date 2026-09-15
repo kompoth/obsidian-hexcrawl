@@ -1,8 +1,12 @@
 import type { HexCoord } from "./types";
 
-export function parseHexNoteFrontmatter(
-	frontmatter: Record<string, unknown>,
-): { q: number; r: number; terrain?: string; icon?: string } | null {
+export function parseHexNoteFrontmatter(frontmatter: Record<string, unknown>): {
+	q: number;
+	r: number;
+	terrain?: string;
+	icon?: string;
+	gmIcon?: string;
+} | null {
 	const q = Number(frontmatter["hex-q"]);
 	const r = Number(frontmatter["hex-r"]);
 	if (!Number.isInteger(q) || !Number.isInteger(r)) return null;
@@ -14,7 +18,12 @@ export function parseHexNoteFrontmatter(
 	const iconRaw = frontmatter["hex-icon"];
 	const icon =
 		typeof iconRaw === "string" && iconRaw.trim() ? iconRaw.trim() : undefined;
-	return { q, r, terrain, icon };
+	const gmIconRaw = frontmatter["hex-gm-icon"];
+	const gmIcon =
+		typeof gmIconRaw === "string" && gmIconRaw.trim()
+			? gmIconRaw.trim()
+			: undefined;
+	return { q, r, terrain, icon, gmIcon };
 }
 
 export function parsePathFrontmatter(

@@ -24,6 +24,13 @@ export function resolveIconName(
 	return note?.icon ?? resolvePaletteEntry(note, palette)?.icon;
 }
 
+/** A hex's GM-only icon name: its own hex-gm-icon value, with no palette-driven fallback. */
+export function resolveGmIconName(
+	note: HexNoteData | undefined,
+): string | undefined {
+	return note?.gmIcon;
+}
+
 /** Looks up a global palette by name, falling back to the settings' default when `name` is undefined. */
 export function resolveNamedPalette(
 	name: string | undefined,

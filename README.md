@@ -44,13 +44,14 @@ hex-terrain: forest
 
 A toolbar pinned to the top-right corner of every rendered map lets you edit it directly, with no frontmatter to hand-write:
 
-| Tool   | What it does                                                                                                    |
-| ------ | --------------------------------------------------------------------------------------------------------------- |
-| Brush  | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it.                                      |
-| Bucket | Flood-fill connected same-terrain hexes with a new one.                                                         |
-| Icon   | Drop an icon from the palette's icon folder onto a hex, or erase it.                                            |
-| Path   | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points. |
-| Layers | Toggle terrain, icons, and paths on or off independently.                                                       |
+| Tool    | What it does                                                                                                    |
+| ------- | --------------------------------------------------------------------------------------------------------------- |
+| Brush   | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it.                                      |
+| Bucket  | Flood-fill connected same-terrain hexes with a new one.                                                         |
+| Icon    | Drop an icon from the palette's icon folder onto a hex, or erase it.                                            |
+| GM Icon | Same as Icon, but for `hex-gm-icon` — its own layer, always rendered above everything else.                     |
+| Path    | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points. |
+| Layers  | Toggle terrain, icons, GM icons, and paths on or off independently.                                             |
 
 Every change is written straight to the affected note's frontmatter (or creates a new path note), so the map and the notes never drift apart.
 
@@ -68,6 +69,7 @@ Every change is written straight to the affected note's frontmatter (or creates 
 | `coords`      | no       | `false`                | Show q/r coordinate labels along the top and left axes.                                                                |
 | `palette`     | no       | default global palette | Name of a global palette (e.g. `palette: Wikipedia`), or an inline mapping for a one-off palette scoped to this block. |
 | `paths`       | no       | —                      | Vault-relative path to a folder of path notes (roads, rivers, ...).                                                    |
+| `gmIconMode`  | no       | `default`              | How `hex-gm-icon` is rendered: `default` (hex center, like a regular icon) or `mini` (half-size, top-left of the hex). |
 
 ### Palettes
 
@@ -118,6 +120,7 @@ palette:
 | `hex-r`         | yes      | Row coordinate (integer).                                                                                                                                      |
 | `hex-terrain`   | no       | Looked up against the palette's terrain names; falls back to a literal CSS color (e.g. `#4a7c3f`, `green`) if no match. Omit for an uncolored hex.             |
 | `hex-icon`      | no       | Icon basename (no extension) from the active palette's icons folder (or its bundled pack, if none is set). Overrides the palette's own icon for `hex-terrain`. |
+| `hex-gm-icon`   | no       | Icon basename, looked up the same way as `hex-icon`. Rendered on its own layer, above everything else, per the block's `gmIconMode`.                           |
 
 A note missing or non-integer `hex-q`/`hex-r` is ignored.
 

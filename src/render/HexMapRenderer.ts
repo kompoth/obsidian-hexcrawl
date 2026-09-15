@@ -21,22 +21,36 @@ import type { DrawerSelection, ToolKind } from "./Toolbar";
 import { PathTool } from "./PathTool";
 import { TerrainLayer } from "./TerrainLayer";
 import { IconsLayer } from "./IconsLayer";
+import { GmIconsLayer } from "./GmIconsLayer";
 import { UndoManager } from "./UndoManager";
 import type { UndoableAction } from "./UndoManager";
 
 const MIN_GUTTER = 20;
 
+type HexNoteField = "hex-terrain" | "hex-icon" | "hex-gm-icon";
+
 /** One field write applied to a hex note, with enough of its prior state to reverse it. */
 interface FieldMutation {
 	q: number;
 	r: number;
-	field: "hex-terrain" | "hex-icon";
+	field: HexNoteField;
 	prevValue: string | undefined;
 	newValue: string | undefined;
 	/** Whether the hex already had a note before this write — if not, this write created it,
 	 *  and undoing it may need to delete that note again rather than just clearing a field. */
 	noteExistedBefore: boolean;
 }
+
+/** Reads the note property a given frontmatter field maps to — shared by patch() and the
+ *  "does this note have any other configured field" check in revertFieldMutation(). */
+const FIELD_ACCESSORS: Record<
+	HexNoteField,
+	(note: HexNoteData) => string | undefined
+> = {
+	"hex-terrain": (note) => note.terrain,
+	"hex-icon": (note) => note.icon,
+	"hex-gm-icon": (note) => note.gmIcon,
+};
 
 export class HexMapRenderer {
 	private folder: TFolder | null = null;
@@ -55,6 +69,7 @@ export class HexMapRenderer {
 	private pathTool: PathTool;
 	private terrainLayer: TerrainLayer;
 	private iconsLayer: IconsLayer;
+	private gmIconsLayer: GmIconsLayer;
 	private undoManager = new UndoManager();
 
 	constructor(
@@ -76,6 +91,7 @@ export class HexMapRenderer {
 		);
 		this.terrainLayer = new TerrainLayer(params);
 		this.iconsLayer = new IconsLayer(app, params);
+		this.gmIconsLayer = new GmIconsLayer(app, params);
 	}
 
 	render(): void {
@@ -133,9 +149,9 @@ export class HexMapRenderer {
 		viewportEl.style.width = `${totalSize.width}px`;
 		viewportEl.style.height = `${totalSize.height}px`;
 
-		// Stacking order, bottom to top: terrain colors, then paths, then icons — icons
-		// render last (and so on top of paths) so a path crossing a hex never paints over
-		// its icon.
+		// Stacking order, bottom to top: terrain colors, then paths, then icons, then GM
+		// icons — each renders after the last (and so on top of it) so nothing crossing a
+		// hex ever paints over what's above it. GM icons are topmost, above everything.
 		this.terrainLayer.mount(viewportEl);
 		this.terrainLayer.render(this.hexNotes, gutter);
 
@@ -144,6 +160,11 @@ export class HexMapRenderer {
 		this.iconsLayer.mount(viewportEl, totalSize);
 		void this.iconsLayer.load(resolveIconsFolder(this.params)).then(() => {
 			this.iconsLayer.render(this.hexNotes, gutter);
+		});
+
+		this.gmIconsLayer.mount(viewportEl, totalSize);
+		void this.gmIconsLayer.load().then(() => {
+			this.gmIconsLayer.render(this.hexNotes, gutter);
 		});
 
 		if (showCoords)
@@ -223,8 +244,13 @@ export class HexMapRenderer {
 
 	/** Layers tool's drawer: one toggle per layer, independent of one another (not single-select). */
 	private populateLayersDrawer(scrollEl: HTMLElement): void {
-		const layers = [this.terrainLayer, this.pathTool, this.iconsLayer] as const;
-		const labels = ["Terrain", "Paths", "Icons"] as const;
+		const layers = [
+			this.terrainLayer,
+			this.pathTool,
+			this.iconsLayer,
+			this.gmIconsLayer,
+		] as const;
+		const labels = ["Terrain", "Paths", "Icons", "GM Icons"] as const;
 		layers.forEach((layer, i) => {
 			createDrawerToggleItem(
 				scrollEl,
@@ -350,6 +376,16 @@ export class HexMapRenderer {
 				if (m) this.undoManager.push(this.makeFieldAction([m]));
 				break;
 			}
+			case "gm-icon": {
+				const m = await this.writeHexField(
+					q,
+					r,
+					"hex-gm-icon",
+					selection.erase ? undefined : selection.value,
+				);
+				if (m) this.undoManager.push(this.makeFieldAction([m]));
+				break;
+			}
 			case "bucket":
 				if (!selection.erase) await this.bucketFill(q, r, selection.value);
 				break;
@@ -403,13 +439,12 @@ export class HexMapRenderer {
 	private async writeHexField(
 		q: number,
 		r: number,
-		field: "hex-terrain" | "hex-icon",
+		field: HexNoteField,
 		value: string | undefined,
 	): Promise<FieldMutation | null> {
 		const key = hexKey(q, r);
 		const existing = this.hexNotes.get(key);
-		const prevValue =
-			field === "hex-terrain" ? existing?.terrain : existing?.icon;
+		const prevValue = existing && FIELD_ACCESSORS[field](existing);
 		if (prevValue === value) return null;
 		await this.applyFieldValue(q, r, field, value);
 		return {
@@ -432,14 +467,19 @@ export class HexMapRenderer {
 	private async applyFieldValue(
 		q: number,
 		r: number,
-		field: "hex-terrain" | "hex-icon",
+		field: HexNoteField,
 		value: string | undefined,
 	): Promise<void> {
 		const key = hexKey(q, r);
 		const existing = this.hexNotes.get(key);
-		const patch = (base: { terrain?: string; icon?: string }) => ({
+		const patch = (base: {
+			terrain?: string;
+			icon?: string;
+			gmIcon?: string;
+		}) => ({
 			terrain: field === "hex-terrain" ? value : base.terrain,
 			icon: field === "hex-icon" ? value : base.icon,
+			gmIcon: field === "hex-gm-icon" ? value : base.gmIcon,
 		});
 
 		if (existing) {
@@ -456,6 +496,7 @@ export class HexMapRenderer {
 			this.hexNotes.set(key, updated);
 			this.terrainLayer.updateHex(q, r, updated);
 			this.iconsLayer.updateHex(q, r, updated);
+			this.gmIconsLayer.updateHex(q, r, updated);
 			return;
 		}
 
@@ -474,6 +515,7 @@ export class HexMapRenderer {
 			this.hexNotes.set(key, created);
 			this.terrainLayer.updateHex(q, r, created);
 			this.iconsLayer.updateHex(q, r, created);
+			this.gmIconsLayer.updateHex(q, r, created);
 		} finally {
 			this.pendingCreates.delete(key);
 		}
@@ -493,9 +535,11 @@ export class HexMapRenderer {
 		const key = hexKey(m.q, m.r);
 		const existing = this.hexNotes.get(key);
 		if (!existing) return;
-		const otherField =
-			m.field === "hex-terrain" ? existing.icon : existing.terrain;
-		if (otherField !== undefined) {
+		const hasOtherField = (Object.keys(FIELD_ACCESSORS) as HexNoteField[]).some(
+			(field) =>
+				field !== m.field && FIELD_ACCESSORS[field](existing) !== undefined,
+		);
+		if (hasOtherField) {
 			await this.applyFieldValue(m.q, m.r, m.field, undefined);
 			return;
 		}
@@ -505,6 +549,7 @@ export class HexMapRenderer {
 		this.hexNotes.delete(key);
 		this.terrainLayer.updateHex(m.q, m.r, undefined);
 		this.iconsLayer.updateHex(m.q, m.r, undefined);
+		this.gmIconsLayer.updateHex(m.q, m.r, undefined);
 	}
 
 	private makeFieldAction(mutations: FieldMutation[]): UndoableAction {

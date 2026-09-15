@@ -1,7 +1,13 @@
 import { parseYaml } from "obsidian";
-import type { HexcrawlBlockParams, Palette, PathDashStyle } from "./types";
+import type {
+	GmIconMode,
+	HexcrawlBlockParams,
+	Palette,
+	PathDashStyle,
+} from "./types";
 
 const DASH_STYLES: PathDashStyle[] = ["solid", "dashed", "dotted"];
+const GM_ICON_MODES: GmIconMode[] = ["default", "mini"];
 
 export type ParamsResult =
 	{ ok: true; value: HexcrawlBlockParams } | { ok: false; error: string };
@@ -96,6 +102,18 @@ export function parseHexcrawlParams(
 	const paletteResult = parsePalette(params.palette, resolveNamedPalette);
 	if (!paletteResult.ok) return paletteResult;
 
+	const gmIconModeRaw =
+		typeof params.gmIconMode === "string"
+			? params.gmIconMode.toLowerCase()
+			: "default";
+	if (!GM_ICON_MODES.includes(gmIconModeRaw as GmIconMode)) {
+		return {
+			ok: false,
+			error: `Invalid gmIconMode "${String(params.gmIconMode)}" — expected one of: ${GM_ICON_MODES.join(", ")}.`,
+		};
+	}
+	const gmIconMode = gmIconModeRaw as GmIconMode;
+
 	return {
 		ok: true,
 		value: {
@@ -109,6 +127,7 @@ export function parseHexcrawlParams(
 			showCoords,
 			palette: paletteResult.value,
 			pathsFolder,
+			gmIconMode,
 		},
 	};
 }

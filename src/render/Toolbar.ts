@@ -3,16 +3,18 @@ import type { HexcrawlBlockParams } from "../types";
 import { resolveIcons } from "../dataLoaders";
 import { resolveIconsFolder } from "../palette";
 
-export type ToolKind = "brush" | "bucket" | "icon" | "path" | "layers";
+export type ToolKind =
+	"brush" | "bucket" | "icon" | "gm-icon" | "path" | "layers";
 
 /** What's currently picked in the drawer: the eraser, or a named palette/icon value. */
 export type DrawerSelection = { erase: true } | { erase: false; value: string };
 
 /** Toolbar tools, top to bottom. */
 const TOOLS: { kind: ToolKind; icon: string; label: string }[] = [
-	{ kind: "brush", icon: "paintbrush", label: "Brush" },
+	{ kind: "brush", icon: "hexagon", label: "Brush" },
 	{ kind: "bucket", icon: "paint-bucket", label: "Bucket" },
-	{ kind: "icon", icon: "image", label: "Icon" },
+	{ kind: "icon", icon: "flag", label: "Icon" },
+	{ kind: "gm-icon", icon: "hat-glasses", label: "GM Icon" },
 	{ kind: "path", icon: "route", label: "Path" },
 	{ kind: "layers", icon: "layers", label: "Layers" },
 ];
@@ -210,13 +212,15 @@ export class Toolbar {
 		// Added first, not after the tool-specific items, so its position doesn't depend on
 		// the async terrain/icon populates below resolving before or after this runs.
 		this.addExitItem(scrollEl);
-		if (kind === "brush" || kind === "icon") this.addEraserItem(scrollEl);
+		if (kind === "brush" || kind === "icon" || kind === "gm-icon")
+			this.addEraserItem(scrollEl);
 		switch (kind) {
 			case "brush":
 			case "bucket":
 				void this.populateTerrainDrawer(scrollEl, renderId);
 				break;
 			case "icon":
+			case "gm-icon":
 				void this.populateIconDrawer(scrollEl, renderId);
 				break;
 			case "path":

@@ -27,13 +27,15 @@
 }
 
 .hexcrawl-layer-terrain,
-.hexcrawl-layer-icons {
+.hexcrawl-layer-icons,
+.hexcrawl-layer-gm-icons {
 	position: absolute;
 	top: 0;
 	left: 0;
 }
 
-.hexcrawl-layer-icons {
+.hexcrawl-layer-icons,
+.hexcrawl-layer-gm-icons {
 	pointer-events: none;
 }
 
@@ -151,14 +153,14 @@
 	justify-content: center;
 	width: 28px;
 	height: 28px;
-	background-color: transparent;
 	border-radius: var(--radius-s);
+	background-color: var(--interactive-normal);
 	color: var(--text-muted);
 	cursor: pointer;
 }
 
 .hexcrawl-tool-btn:hover {
-	background-color: var(--background-modifier-hover);
+	background-color: var(--interactive-hover);
 	color: var(--text-normal);
 }
 

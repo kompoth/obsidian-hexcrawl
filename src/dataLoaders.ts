@@ -22,6 +22,7 @@ export function loadHexNotes(
 			name: child.basename,
 			terrain: parsed.terrain,
 			icon: parsed.icon,
+			gmIcon: parsed.gmIcon,
 		});
 	}
 	return notes;
