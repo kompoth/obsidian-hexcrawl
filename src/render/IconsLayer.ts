@@ -86,8 +86,9 @@ export class IconsLayer {
 		}
 	}
 
-	/** Re-derives one hex's icon (add/update/remove) from its current note data. */
-	updateHex(q: number, r: number, note: HexNoteData): void {
+	/** Re-derives one hex's icon (add/update/remove) from its current note data — or, if `note`
+	 *  is undefined (an undo deleted the hex's last configured field's note), removes any icon. */
+	updateHex(q: number, r: number, note: HexNoteData | undefined): void {
 		const el = this.el;
 		if (!el) return;
 		const key = hexKey(q, r);

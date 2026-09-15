@@ -61,8 +61,12 @@ export class TerrainLayer {
 		}
 	}
 
-	/** Re-derives one hex's color/tooltip/clickability from its current note data. */
-	updateHex(q: number, r: number, note: HexNoteData): void {
+	/**
+	 * Re-derives one hex's color/tooltip/clickability from its current note data — or, if
+	 * `note` is undefined (an undo deleted the hex's last configured field's note), resets it
+	 * back to a plain unconfigured hex.
+	 */
+	updateHex(q: number, r: number, note: HexNoteData | undefined): void {
 		const key = hexKey(q, r);
 		const hexEl = this.hexElements.get(key);
 		if (!hexEl) return;
@@ -71,9 +75,15 @@ export class TerrainLayer {
 		this.hexColors.set(key, color);
 		if (this.visible) hexEl.style.backgroundColor = color;
 
-		hexEl.setAttr("data-note-path", note.path);
-		hexEl.addClass("hexcrawl-hex-configured");
-		if (!note.name.startsWith("_")) setTooltip(hexEl, note.name);
+		if (note) {
+			hexEl.setAttr("data-note-path", note.path);
+			hexEl.addClass("hexcrawl-hex-configured");
+			if (!note.name.startsWith("_")) setTooltip(hexEl, note.name);
+		} else {
+			hexEl.removeAttribute("data-note-path");
+			hexEl.removeClass("hexcrawl-hex-configured");
+			setTooltip(hexEl, "");
+		}
 	}
 
 	/**

@@ -2,6 +2,7 @@ import {
 	App,
 	MarkdownPostProcessorContext,
 	normalizePath,
+	Platform,
 	TFile,
 	TFolder,
 } from "obsidian";
@@ -20,8 +21,22 @@ import type { DrawerSelection, ToolKind } from "./Toolbar";
 import { PathTool } from "./PathTool";
 import { TerrainLayer } from "./TerrainLayer";
 import { IconsLayer } from "./IconsLayer";
+import { UndoManager } from "./UndoManager";
+import type { UndoableAction } from "./UndoManager";
 
 const MIN_GUTTER = 20;
+
+/** One field write applied to a hex note, with enough of its prior state to reverse it. */
+interface FieldMutation {
+	q: number;
+	r: number;
+	field: "hex-terrain" | "hex-icon";
+	prevValue: string | undefined;
+	newValue: string | undefined;
+	/** Whether the hex already had a note before this write — if not, this write created it,
+	 *  and undoing it may need to delete that note again rather than just clearing a field. */
+	noteExistedBefore: boolean;
+}
 
 export class HexMapRenderer {
 	private folder: TFolder | null = null;
@@ -32,11 +47,15 @@ export class HexMapRenderer {
 	/** Hex key last painted by the current brush drag gesture, so dragging across a hex
 	 *  doesn't re-fire the write on every pointermove while the pointer sits over it. */
 	private lastPaintedKey: string | null = null;
+	/** Mutations from the current brush drag-stroke, collected so the whole stroke undoes
+	 *  as one step instead of one step per hex. */
+	private strokeMutationPromises: Promise<FieldMutation | null>[] = [];
 
 	private toolbar: Toolbar;
 	private pathTool: PathTool;
 	private terrainLayer: TerrainLayer;
 	private iconsLayer: IconsLayer;
+	private undoManager = new UndoManager();
 
 	constructor(
 		private app: App,
@@ -49,8 +68,11 @@ export class HexMapRenderer {
 			populatePathDrawer: (scrollEl) => this.pathTool.populateDrawer(scrollEl),
 			populateLayersDrawer: (scrollEl) => this.populateLayersDrawer(scrollEl),
 		});
-		this.pathTool = new PathTool(app, params, () =>
-			this.toolbar.refreshDrawer(),
+		this.pathTool = new PathTool(
+			app,
+			params,
+			() => this.toolbar.refreshDrawer(),
+			this.undoManager,
 		);
 		this.terrainLayer = new TerrainLayer(params);
 		this.iconsLayer = new IconsLayer(app, params);
@@ -93,8 +115,12 @@ export class HexMapRenderer {
 			pathsFolderObj instanceof TFolder ? pathsFolderObj : null,
 		);
 
-		const clipEl = this.container.createDiv({ cls: "hexcrawl-clip" });
+		const clipEl = this.container.createDiv({
+			cls: "hexcrawl-clip",
+			attr: { tabindex: "0" },
+		});
 		clipEl.style.height = `${height}px`;
+		clipEl.addEventListener("keydown", (e) => this.handleUndoRedoKey(e));
 		const viewportEl = clipEl.createDiv({ cls: "hexcrawl-viewport" });
 		this.toolbar.mount(clipEl);
 
@@ -139,7 +165,30 @@ export class HexMapRenderer {
 			(e) => this.handleClick(e),
 			() => this.toolbar.activeTool === "brush",
 			(e) => this.paintAt(e),
+			() => void this.endPaintStroke(),
 		);
+	}
+
+	/**
+	 * Undo is Cmd+Z / redo Cmd+Shift+Z on macOS (its OS-standard shortcuts); Ctrl+Z / Ctrl+Y
+	 * elsewhere. Scoped to clipEl (focused on every pointerdown inside the map) rather than
+	 * the document, so it doesn't fight with Obsidian's own editor undo while a note is open.
+	 */
+	private handleUndoRedoKey(e: KeyboardEvent): void {
+		const key = e.key.toLowerCase();
+		if (key !== "z" && key !== "y") return;
+
+		const isUndo = Platform.isMacOS
+			? e.metaKey && !e.shiftKey && key === "z"
+			: e.ctrlKey && !e.shiftKey && key === "z";
+		const isRedo = Platform.isMacOS
+			? e.metaKey && e.shiftKey && key === "z"
+			: e.ctrlKey && key === "y";
+		if (!isUndo && !isRedo) return;
+
+		e.preventDefault();
+		e.stopPropagation();
+		void (isUndo ? this.undoManager.undo() : this.undoManager.redo());
 	}
 
 	private renderAxisLabels(
@@ -227,10 +276,15 @@ export class HexMapRenderer {
 	/**
 	 * Brush drag-paint: fires on pointerdown and every pointermove while the brush tool is
 	 * active, painting each new hex the pointer crosses into (deduped against the last
-	 * painted hex so holding still over one hex doesn't re-fire the write).
+	 * painted hex so holding still over one hex doesn't re-fire the write). Mutations are
+	 * collected rather than pushed to the undo stack immediately — endPaintStroke() bundles
+	 * the whole drag into a single undo step once the pointer is released.
 	 */
 	private paintAt(e: PointerEvent): void {
-		if (e.type === "pointerdown") this.lastPaintedKey = null;
+		if (e.type === "pointerdown") {
+			this.lastPaintedKey = null;
+			this.strokeMutationPromises = [];
+		}
 
 		const hit = document.elementFromPoint(e.clientX, e.clientY);
 		if (!hit) return;
@@ -244,7 +298,27 @@ export class HexMapRenderer {
 		if (key === this.lastPaintedKey) return;
 		this.lastPaintedKey = key;
 
-		void this.runTool(q, r, "brush", this.toolbar.drawerSelection);
+		const selection = this.toolbar.drawerSelection;
+		if (!selection) return;
+		this.strokeMutationPromises.push(
+			this.writeHexField(
+				q,
+				r,
+				"hex-terrain",
+				selection.erase ? undefined : selection.value,
+			),
+		);
+	}
+
+	/** Bundles the current brush drag-stroke's mutations into a single undo step. */
+	private async endPaintStroke(): Promise<void> {
+		const promises = this.strokeMutationPromises;
+		this.strokeMutationPromises = [];
+		const mutations = (await Promise.all(promises)).filter(
+			(m): m is FieldMutation => m !== null,
+		);
+		if (mutations.length > 0)
+			this.undoManager.push(this.makeFieldAction(mutations));
 	}
 
 	private async runTool(
@@ -256,22 +330,26 @@ export class HexMapRenderer {
 		if (!selection) return;
 
 		switch (activeTool) {
-			case "brush":
-				await this.writeHexField(
+			case "brush": {
+				const m = await this.writeHexField(
 					q,
 					r,
 					"hex-terrain",
 					selection.erase ? undefined : selection.value,
 				);
+				if (m) this.undoManager.push(this.makeFieldAction([m]));
 				break;
-			case "icon":
-				await this.writeHexField(
+			}
+			case "icon": {
+				const m = await this.writeHexField(
 					q,
 					r,
 					"hex-icon",
 					selection.erase ? undefined : selection.value,
 				);
+				if (m) this.undoManager.push(this.makeFieldAction([m]));
 				break;
+			}
 			case "bucket":
 				if (!selection.erase) await this.bucketFill(q, r, selection.value);
 				break;
@@ -282,7 +360,8 @@ export class HexMapRenderer {
 		}
 	}
 
-	/** Flood-fills the contiguous region of hexes sharing the clicked hex's current hex-terrain. */
+	/** Flood-fills the contiguous region of hexes sharing the clicked hex's current hex-terrain,
+	 *  as a single undo step. */
 	private async bucketFill(q: number, r: number, value: string): Promise<void> {
 		const { cols, rows, orientation, stagger } = this.params;
 		const startTerrain = this.hexNotes.get(hexKey(q, r))?.terrain;
@@ -304,11 +383,43 @@ export class HexMapRenderer {
 			}
 		}
 
-		await Promise.all(
-			region.map((cell) =>
-				this.writeHexField(cell.q, cell.r, "hex-terrain", value),
-			),
-		);
+		const mutations = (
+			await Promise.all(
+				region.map((cell) =>
+					this.writeHexField(cell.q, cell.r, "hex-terrain", value),
+				),
+			)
+		).filter((m): m is FieldMutation => m !== null);
+		if (mutations.length > 0)
+			this.undoManager.push(this.makeFieldAction(mutations));
+	}
+
+	/**
+	 * Applies a field write and returns enough of its prior state to undo it later — or null
+	 * if the value didn't actually change (nothing to undo). Doesn't touch the undo stack
+	 * itself: callers batch mutations (a whole brush stroke, a whole bucket fill) into one
+	 * undo step before pushing.
+	 */
+	private async writeHexField(
+		q: number,
+		r: number,
+		field: "hex-terrain" | "hex-icon",
+		value: string | undefined,
+	): Promise<FieldMutation | null> {
+		const key = hexKey(q, r);
+		const existing = this.hexNotes.get(key);
+		const prevValue =
+			field === "hex-terrain" ? existing?.terrain : existing?.icon;
+		if (prevValue === value) return null;
+		await this.applyFieldValue(q, r, field, value);
+		return {
+			q,
+			r,
+			field,
+			prevValue,
+			newValue: value,
+			noteExistedBefore: !!existing,
+		};
 	}
 
 	/**
@@ -318,7 +429,7 @@ export class HexMapRenderer {
 	 * Patches the live DOM in place afterward rather than re-rendering the whole map, so pan/
 	 * zoom/tool state survives.
 	 */
-	private async writeHexField(
+	private async applyFieldValue(
 		q: number,
 		r: number,
 		field: "hex-terrain" | "hex-icon",
@@ -366,5 +477,46 @@ export class HexMapRenderer {
 		} finally {
 			this.pendingCreates.delete(key);
 		}
+	}
+
+	/**
+	 * Reverses one mutation for undo. If the mutation created the note (it didn't exist
+	 * before), clearing the field again may leave the note fully unconfigured — in that case
+	 * the note is deleted outright, matching the hex's true prior state.
+	 */
+	private async revertFieldMutation(m: FieldMutation): Promise<void> {
+		if (m.noteExistedBefore) {
+			await this.applyFieldValue(m.q, m.r, m.field, m.prevValue);
+			return;
+		}
+
+		const key = hexKey(m.q, m.r);
+		const existing = this.hexNotes.get(key);
+		if (!existing) return;
+		const otherField =
+			m.field === "hex-terrain" ? existing.icon : existing.terrain;
+		if (otherField !== undefined) {
+			await this.applyFieldValue(m.q, m.r, m.field, undefined);
+			return;
+		}
+
+		const file = this.app.vault.getAbstractFileByPath(existing.path);
+		if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+		this.hexNotes.delete(key);
+		this.terrainLayer.updateHex(m.q, m.r, undefined);
+		this.iconsLayer.updateHex(m.q, m.r, undefined);
+	}
+
+	private makeFieldAction(mutations: FieldMutation[]): UndoableAction {
+		return {
+			undo: async () => {
+				for (let i = mutations.length - 1; i >= 0; i--)
+					await this.revertFieldMutation(mutations[i]);
+			},
+			redo: async () => {
+				for (const m of mutations)
+					await this.applyFieldValue(m.q, m.r, m.field, m.newValue);
+			},
+		};
 	}
 }

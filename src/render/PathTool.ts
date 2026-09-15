@@ -10,6 +10,7 @@ import { uniqueFileName } from "../naming";
 import { PathLayer } from "./PathLayer";
 import { applyPathPreviewStyle } from "./pathStyle";
 import { createDrawerItem, renderDrawerEmpty } from "./Toolbar";
+import type { UndoManager } from "./UndoManager";
 
 /** Nested state machine for the Path tool — everything else is single-click paint/fill.
  *  Editing has no sub-modes: moving a point (drag), inserting one mid-path (drag a
@@ -60,6 +61,7 @@ export class PathTool {
 		private app: App,
 		private params: HexcrawlBlockParams,
 		private refreshDrawer: () => void,
+		private undoManager: UndoManager,
 	) {
 		this.layer = new PathLayer(params);
 	}
@@ -88,18 +90,39 @@ export class PathTool {
 
 	/**
 	 * Abandons whatever the Path tool is doing and returns to idle. A path being drawn is
-	 * already saved to disk once it has 2+ points (nothing to undo), so this just needs to
-	 * fold it into the in-memory paths list — otherwise it would keep rendering as the
-	 * "in progress" preview instead of a normal path until the block is fully re-rendered.
+	 * already saved to disk once it has 2+ points, so this just needs to fold it into the
+	 * in-memory paths list (otherwise it would keep rendering as the "in progress" preview
+	 * instead of a normal path until the block is fully re-rendered) and register the whole
+	 * draw as one undo step — undoing it deletes the note again, redoing recreates it.
 	 */
 	reset(): void {
 		const state = this.state;
 		if (state.mode === "drawing" && state.file) {
-			this.pathsList.push({
+			const path: PathData = {
 				notePath: state.file.path,
 				name: state.file.basename,
 				type: state.type,
 				hexes: [...state.hexes],
+			};
+			this.pathsList.push(path);
+			this.undoManager.push({
+				undo: async () => {
+					const file = this.app.vault.getAbstractFileByPath(path.notePath);
+					if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+					this.pathsList = this.pathsList.filter((p) => p !== path);
+					this.render();
+					this.refreshDrawer();
+				},
+				redo: async () => {
+					if (!this.pathsFolder) return;
+					await this.app.vault.create(
+						path.notePath,
+						this.buildPathFrontmatter(path.type, path.hexes),
+					);
+					this.pathsList.push(path);
+					this.render();
+					this.refreshDrawer();
+				},
 			});
 		}
 		this.drawingFilePromise = null;
@@ -316,23 +339,67 @@ export class PathTool {
 				),
 		);
 		const path = normalizePath(`${folder.path}/${fileName}.md`);
+		return this.app.vault.create(
+			path,
+			this.buildPathFrontmatter(state.type, state.hexes),
+		);
+	}
 
+	private buildPathFrontmatter(
+		type: string | undefined,
+		hexes: HexCoord[],
+	): string {
 		const lines = ["---"];
-		if (state.type) lines.push(`path-type: ${JSON.stringify(state.type)}`);
+		if (type) lines.push(`path-type: ${JSON.stringify(type)}`);
 		lines.push("path-hexes:");
-		for (const h of state.hexes) lines.push(`  - [${h.q}, ${h.r}]`);
+		for (const h of hexes) lines.push(`  - [${h.q}, ${h.r}]`);
 		lines.push("---", "");
-
-		return this.app.vault.create(path, lines.join("\n"));
+		return lines.join("\n");
 	}
 
 	private async deleteSelectedPath(path: PathData): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(path.notePath);
 		if (file instanceof TFile) await this.app.fileManager.trashFile(file);
 		this.pathsList = this.pathsList.filter((p) => p !== path);
+		this.undoManager.push({
+			undo: async () => {
+				if (!this.pathsFolder) return;
+				await this.app.vault.create(
+					path.notePath,
+					this.buildPathFrontmatter(path.type, path.hexes),
+				);
+				this.pathsList.push(path);
+				this.render();
+				this.refreshDrawer();
+			},
+			redo: async () => {
+				const file = this.app.vault.getAbstractFileByPath(path.notePath);
+				if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+				this.pathsList = this.pathsList.filter((p) => p !== path);
+				this.render();
+				this.refreshDrawer();
+			},
+		});
 		this.state = { mode: "idle" };
 		this.render();
 		this.refreshDrawer();
+	}
+
+	/** Registers one undo step for a hexes-array change already applied+saved to `path`. */
+	private pushHexesUndo(path: PathData, prevHexes: HexCoord[]): void {
+		const newHexes = [...path.hexes];
+		this.undoManager.push({
+			undo: async () => {
+				path.hexes = prevHexes;
+				await this.savePathHexes(path);
+				this.render();
+			},
+			redo: async () => {
+				path.hexes = newHexes;
+				await this.savePathHexes(path);
+				this.render();
+			},
+		});
 	}
 
 	private async movePathPoint(
@@ -341,8 +408,10 @@ export class PathTool {
 		q: number,
 		r: number,
 	): Promise<void> {
+		const prevHexes = [...path.hexes];
 		path.hexes[index] = { q, r };
 		await this.savePathHexes(path);
+		this.pushHexesUndo(path, prevHexes);
 		this.render();
 	}
 
@@ -352,8 +421,10 @@ export class PathTool {
 		q: number,
 		r: number,
 	): Promise<void> {
+		const prevHexes = [...path.hexes];
 		path.hexes.splice(at, 0, { q, r });
 		await this.savePathHexes(path);
+		this.pushHexesUndo(path, prevHexes);
 		this.render();
 	}
 
@@ -364,8 +435,10 @@ export class PathTool {
 			);
 			return;
 		}
+		const prevHexes = [...path.hexes];
 		path.hexes.splice(index, 1);
 		await this.savePathHexes(path);
+		this.pushHexesUndo(path, prevHexes);
 		this.render();
 	}
 

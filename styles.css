@@ -10,6 +10,9 @@
 	user-select: none;
 	-webkit-user-select: none;
 	-webkit-user-drag: none;
+	/* Focusable (tabindex) so undo/redo's keyboard shortcut is scoped to the map instead of
+	   the document, but not a visible focus target — every click/drag focuses it. */
+	outline: none;
 }
 
 .hexcrawl-clip.hexcrawl-dragging {

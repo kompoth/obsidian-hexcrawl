@@ -8,8 +8,9 @@ const DRAG_THRESHOLD = 5;
 /**
  * Wires wheel-zoom and drag-to-pan onto clipEl/viewportEl; a plain (non-drag) click fires
  * onClick. While isPaintMode() is true, a pointer-down starts painting instead of panning:
- * onPaint fires on pointerdown and on every subsequent pointermove, letting the caller
- * paint a continuous line of hexes instead of one hex per click.
+ * onPaint fires on pointerdown and on every subsequent pointermove, letting the caller paint
+ * a continuous line of hexes instead of one hex per click; onPaintEnd fires once the stroke
+ * is released, so the caller can group it into a single undo step.
  */
 export function setupPanAndZoom(
 	container: HTMLElement,
@@ -20,6 +21,7 @@ export function setupPanAndZoom(
 	onClick: (e: PointerEvent) => void,
 	isPaintMode: () => boolean,
 	onPaint: (e: PointerEvent) => void,
+	onPaintEnd: () => void,
 ): void {
 	let scale = 1;
 	let panX = 0;
@@ -89,6 +91,10 @@ export function setupPanAndZoom(
 		e.preventDefault();
 		userInteracted = true;
 		clipEl.setPointerCapture(e.pointerId);
+		// preventDefault() above also suppresses the browser's default click-to-focus, which
+		// undo/redo's keyboard shortcut relies on (it's scoped to this element so it doesn't
+		// fight with Obsidian's own editor undo).
+		clipEl.focus();
 
 		if (isPaintMode()) {
 			painting = true;
@@ -122,6 +128,7 @@ export function setupPanAndZoom(
 	const endDrag = (e: PointerEvent) => {
 		if (painting) {
 			painting = false;
+			onPaintEnd();
 			return;
 		}
 		if (!dragging) return;

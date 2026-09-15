@@ -109,6 +109,7 @@ export class Toolbar {
 	private _drawerSelection: DrawerSelection | null = null;
 	private scrollEl: HTMLElement | null = null;
 	private drawerEl: HTMLElement | null = null;
+	private clipEl: HTMLElement | null = null;
 	private buttons: HTMLElement[] = [];
 	/** Bumped on every populateDrawer() call so a stale async populate (from a tool switch
 	 *  mid-flight) can detect it's no longer current and skip rendering into the drawer. */
@@ -141,6 +142,7 @@ export class Toolbar {
 		const scrollEl = drawerEl.createDiv({ cls: "hexcrawl-drawer-scroll" });
 		this.scrollEl = scrollEl;
 		this.drawerEl = drawerEl;
+		this.clipEl = clipEl;
 
 		for (const tool of TOOLS) {
 			const btn = toolbarEl.createDiv({
@@ -188,6 +190,9 @@ export class Toolbar {
 		this._activeTool = null;
 		this._drawerSelection = null;
 		this.hooks.onToolChange(null);
+		// Hiding the drawer blurs a focused item inside it (e.g. this "Exit" click itself)
+		// out to <body> — reclaim focus so the map's undo/redo shortcut keeps working.
+		this.clipEl?.focus();
 	}
 
 	/** Re-renders the drawer for whichever tool is currently active — used after Path-tool state changes. */
@@ -198,6 +203,9 @@ export class Toolbar {
 
 	private populateDrawer(scrollEl: HTMLElement, kind: ToolKind): void {
 		scrollEl.empty();
+		// Emptying can blur a focused drawer item (e.g. "Confirm Delete", just clicked) out
+		// to <body> — reclaim focus so the map's undo/redo shortcut keeps working afterward.
+		this.clipEl?.focus();
 		const renderId = ++this.drawerRenderId;
 		// Added first, not after the tool-specific items, so its position doesn't depend on
 		// the async terrain/icon populates below resolving before or after this runs.
