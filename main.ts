@@ -1,7 +1,7 @@
 import { Plugin } from "obsidian";
 import { parseHexcrawlParams } from "./src/params";
 import { HexMapRenderer } from "./src/render/HexMapRenderer";
-import { resolveNamedPalette } from "./src/pure";
+import { resolveNamedPalette } from "./src/palette";
 import { getDefaultSettings } from "./src/settings/settings";
 import type { HexcrawlSettings } from "./src/settings/settings";
 import { HexcrawlSettingTab } from "./src/settings/SettingsTab";

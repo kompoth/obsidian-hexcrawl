@@ -6,7 +6,7 @@ import {
 	hexSize,
 	sharpPath,
 	smoothPath,
-} from "./render/hexGeometry";
+} from "../src/render/hexGeometry";
 
 describe("hexSize", () => {
 	it("flat-top: width is 2R, height is √3·R", () => {

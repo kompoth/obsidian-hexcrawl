@@ -6,7 +6,7 @@ import {
 } from "obsidian";
 import type HexcrawlPlugin from "../../main";
 import { PaletteEditModal } from "./PaletteEditModal";
-import { uniqueKey } from "../pure";
+import { uniqueKey } from "../naming";
 import type { Palette } from "../types";
 
 const PALETTES_DESCRIPTION =

@@ -13,7 +13,7 @@ import {
 	hexNeighbors,
 } from "./hexGeometry";
 import { loadHexNotes } from "../dataLoaders";
-import { resolveIconsFolder } from "../pure";
+import { resolveIconsFolder } from "../palette";
 import { setupPanAndZoom } from "./PanZoom";
 import { createDrawerToggleItem, Toolbar } from "./Toolbar";
 import type { DrawerSelection, ToolKind } from "./Toolbar";
