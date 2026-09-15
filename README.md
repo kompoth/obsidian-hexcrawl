@@ -34,14 +34,6 @@ hex-terrain: forest
 ---
 ```
 
-## Installation
-
-Not yet on the community plugin store. To install manually:
-
-1. Build the plugin (see [Development](#development)).
-2. Copy `main.js`, `manifest.json`, and `styles.css` to `<vault>/.obsidian/plugins/obsidian-hexcrawl/` (or just make a soft link).
-3. Enable **Hexcrawl** under Settings → Community plugins.
-
 ## Alternatives & Inspiration
 
 - Alex Schroeder's [Text Mapper](https://src.alexschroeder.ch/text-mapper.git/) and its [port for Obsidian](https://github.com/modality/obsidian-text-mapper).
@@ -155,11 +147,22 @@ path-spline: true
 | `path-type`     | no       | Looked up against the palette's path types; also applied as a CSS class (`hexcrawl-path-{type}`) for custom styling. |
 | `path-spline`   | no       | Overrides the type's default curve/straight rendering for this path.                                                 |
 
-## Development
+## Contributing
+
+Contributions via bug reports, bug fixes, documentation, and general improvements are always welcome. For more major feature work, make an issue about the feature idea / reach out to me so we can judge feasibility and how best to implement it.
+
+### Local development
 
 ```bash
 npm install
 npm run dev            # watch build
+```
+
+### Preparing for creating pull requests
+
+If you plan on doing pull request, we would also recommend to do the following in advance of creating the pull request:
+
+```bash
 npm run build          # production build (type-checks first)
 npm test               # run unit tests
 npm run lint           # eslint
