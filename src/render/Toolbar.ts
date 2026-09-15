@@ -108,6 +108,8 @@ export class Toolbar {
 	private _activeTool: ToolKind | null = null;
 	private _drawerSelection: DrawerSelection | null = null;
 	private scrollEl: HTMLElement | null = null;
+	private drawerEl: HTMLElement | null = null;
+	private buttons: HTMLElement[] = [];
 	/** Bumped on every populateDrawer() call so a stale async populate (from a tool switch
 	 *  mid-flight) can detect it's no longer current and skip rendering into the drawer. */
 	private drawerRenderId = 0;
@@ -138,8 +140,8 @@ export class Toolbar {
 		drawerEl.addEventListener("wheel", (e) => e.stopPropagation());
 		const scrollEl = drawerEl.createDiv({ cls: "hexcrawl-drawer-scroll" });
 		this.scrollEl = scrollEl;
+		this.drawerEl = drawerEl;
 
-		const buttons: HTMLElement[] = [];
 		for (const tool of TOOLS) {
 			const btn = toolbarEl.createDiv({
 				cls: "hexcrawl-tool-btn",
@@ -155,24 +157,37 @@ export class Toolbar {
 				}
 			});
 			btn.addEventListener("click", () => {
-				const wasActive = btn.hasClass("is-active");
-				for (const other of buttons) {
+				if (btn.hasClass("is-active")) {
+					this.deactivate();
+					return;
+				}
+				for (const other of this.buttons) {
 					other.removeClass("is-active");
 					other.setAttr("aria-pressed", "false");
 				}
-				const nowActive = !wasActive;
-				if (nowActive) {
-					btn.addClass("is-active");
-					btn.setAttr("aria-pressed", "true");
-				}
-				drawerEl.hidden = !nowActive;
-				this._activeTool = nowActive ? tool.kind : null;
+				btn.addClass("is-active");
+				btn.setAttr("aria-pressed", "true");
+				drawerEl.hidden = false;
+				this._activeTool = tool.kind;
 				this._drawerSelection = null;
 				this.hooks.onToolChange(this._activeTool);
-				if (nowActive) this.populateDrawer(scrollEl, tool.kind);
+				this.populateDrawer(scrollEl, tool.kind);
 			});
-			buttons.push(btn);
+			this.buttons.push(btn);
 		}
+	}
+
+	/** Turns off whichever tool is active and hides the drawer — shared by a tool button
+	 *  toggling itself off and by the drawer's own "Exit" item. */
+	private deactivate(): void {
+		for (const btn of this.buttons) {
+			btn.removeClass("is-active");
+			btn.setAttr("aria-pressed", "false");
+		}
+		if (this.drawerEl) this.drawerEl.hidden = true;
+		this._activeTool = null;
+		this._drawerSelection = null;
+		this.hooks.onToolChange(null);
 	}
 
 	/** Re-renders the drawer for whichever tool is currently active — used after Path-tool state changes. */
@@ -184,6 +199,9 @@ export class Toolbar {
 	private populateDrawer(scrollEl: HTMLElement, kind: ToolKind): void {
 		scrollEl.empty();
 		const renderId = ++this.drawerRenderId;
+		// Added first, not after the tool-specific items, so its position doesn't depend on
+		// the async terrain/icon populates below resolving before or after this runs.
+		this.addExitItem(scrollEl);
 		if (kind === "brush" || kind === "icon") this.addEraserItem(scrollEl);
 		switch (kind) {
 			case "brush":
@@ -200,6 +218,15 @@ export class Toolbar {
 				this.hooks.populateLayersDrawer(scrollEl);
 				break;
 		}
+	}
+
+	/** Returns to default mode without undoing any already-completed edits. */
+	private addExitItem(scrollEl: HTMLElement): void {
+		const { previewEl } = createDrawerItem(scrollEl, "Exit", () =>
+			this.deactivate(),
+		);
+		setIcon(previewEl, "log-out");
+		previewEl.addClass("is-danger");
 	}
 
 	private addEraserItem(scrollEl: HTMLElement): void {

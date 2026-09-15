@@ -5,13 +5,25 @@ import type { PathToolState } from "./PathTool";
 
 const MIN_HITAREA_WIDTH = 14;
 
-/** Called when a "move" marker is dragged onto a hex, to let the caller persist the change. */
+/** Called when a point marker is dragged onto a hex, to let the caller move that point there. */
 export type PathPointDragHandler = (
 	path: PathData,
 	index: number,
 	q: number,
 	r: number,
 ) => void;
+
+/** Called when a midpoint marker is dragged onto a hex, to let the caller insert a new point
+ *  there (at the given index) between its two neighbors. */
+export type PathMidpointDropHandler = (
+	path: PathData,
+	insertAt: number,
+	q: number,
+	r: number,
+) => void;
+
+/** Called when a point marker is right-clicked, to let the caller remove that point. */
+export type PathPointRemoveHandler = (path: PathData, index: number) => void;
 
 /** Owns the paths layer's own SVG and draws it — the saved paths plus, if the Path tool is
  *  mid-draw or mid-edit, the in-progress preview line and/or point markers. */
@@ -55,6 +67,8 @@ export class PathLayer {
 		paths: PathData[],
 		state: PathToolState,
 		onPointDrag: PathPointDragHandler,
+		onMidpointDrop: PathMidpointDropHandler,
+		onPointRemove: PathPointRemoveHandler,
 	): void {
 		const svg = this.svg;
 		if (!svg) return;
@@ -131,58 +145,32 @@ export class PathLayer {
 						"data-index": String(i),
 					},
 				});
-				if (state.sub === "move")
-					this.attachMarkerDrag(marker, state.path, i, onPointDrag);
+				this.attachMarkerDrag(marker, (q, r) =>
+					onPointDrag(state.path, i, q, r),
+				);
+				this.attachMarkerRemove(marker, () => onPointRemove(state.path, i));
 			});
-			if (state.sub === "add") {
-				for (let i = 0; i < points.length - 1; i++) {
-					const mx = (points[i].cx + points[i + 1].cx) / 2;
-					const my = (points[i].cy + points[i + 1].cy) / 2;
-					svg.createSvg("circle", {
-						cls: "hexcrawl-path-marker-add",
-						attr: {
-							cx: String(mx),
-							cy: String(my),
-							r: "4",
-							"data-insert-at": String(i + 1),
-						},
-					});
-				}
-				// Extrapolated markers just beyond each end, for prepending/appending a point.
-				if (points.length >= 2) {
-					const first = points[0];
-					const second = points[1];
-					svg.createSvg("circle", {
-						cls: "hexcrawl-path-marker-add",
-						attr: {
-							cx: String(first.cx + (first.cx - second.cx) * 0.5),
-							cy: String(first.cy + (first.cy - second.cy) * 0.5),
-							r: "4",
-							"data-insert-at": "0",
-						},
-					});
-					const last = points[points.length - 1];
-					const secondLast = points[points.length - 2];
-					svg.createSvg("circle", {
-						cls: "hexcrawl-path-marker-add",
-						attr: {
-							cx: String(last.cx + (last.cx - secondLast.cx) * 0.5),
-							cy: String(last.cy + (last.cy - secondLast.cy) * 0.5),
-							r: "4",
-							"data-insert-at": String(points.length),
-						},
-					});
-				}
+			// Midpoints are always shown while editing — dragging one onto a hex inserts a
+			// new point there, between its two neighbors.
+			for (let i = 0; i < points.length - 1; i++) {
+				const mx = (points[i].cx + points[i + 1].cx) / 2;
+				const my = (points[i].cy + points[i + 1].cy) / 2;
+				const insertAt = i + 1;
+				const midpoint = svg.createSvg("circle", {
+					cls: "hexcrawl-path-marker-add",
+					attr: { cx: String(mx), cy: String(my), r: "4" },
+				});
+				this.attachMarkerDrag(midpoint, (q, r) =>
+					onMidpointDrop(state.path, insertAt, q, r),
+				);
 			}
 		}
 	}
 
-	/** Drag-to-move for a single path point marker; snaps to whichever hex the pointer is over on release. */
+	/** Drag-to-drop for a marker; calls onDrop with whichever hex the pointer is over on release. */
 	private attachMarkerDrag(
 		markerEl: SVGCircleElement,
-		path: PathData,
-		index: number,
-		onPointDrag: PathPointDragHandler,
+		onDrop: (q: number, r: number) => void,
 	): void {
 		markerEl.addEventListener("pointerdown", (e: PointerEvent) => {
 			e.stopPropagation();
@@ -211,12 +199,23 @@ export class PathLayer {
 				if (hexEl) {
 					const q = Number(hexEl.getAttribute("data-q"));
 					const r = Number(hexEl.getAttribute("data-r"));
-					if (Number.isInteger(q) && Number.isInteger(r))
-						onPointDrag(path, index, q, r);
+					if (Number.isInteger(q) && Number.isInteger(r)) onDrop(q, r);
 				}
 			};
 			markerEl.addEventListener("pointermove", onMove);
 			markerEl.addEventListener("pointerup", onUp);
+		});
+	}
+
+	/** Right-click-to-remove for a point marker. */
+	private attachMarkerRemove(
+		markerEl: SVGCircleElement,
+		onRemove: () => void,
+	): void {
+		markerEl.addEventListener("contextmenu", (e: MouseEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			onRemove();
 		});
 	}
 }

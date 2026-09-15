@@ -11,10 +11,10 @@ import { PathLayer } from "./PathLayer";
 import { applyPathPreviewStyle } from "./pathStyle";
 import { createDrawerItem, renderDrawerEmpty } from "./Toolbar";
 
-/** Sub-mode when editing an existing path's points. */
-export type EditSub = "move" | "add" | "remove";
-
-/** Nested state machine for the Path tool — everything else is single-click paint/fill. */
+/** Nested state machine for the Path tool — everything else is single-click paint/fill.
+ *  Editing has no sub-modes: moving a point (drag), inserting one mid-path (drag a
+ *  midpoint), and removing one (right-click) are all live simultaneously; pendingEnd
+ *  arms the next hex click to append/prepend a point instead. */
 export type PathToolState =
 	| { mode: "idle" }
 	| {
@@ -22,13 +22,15 @@ export type PathToolState =
 			type: string | undefined;
 			hexes: HexCoord[];
 			prependNext: boolean;
+			/** Set once the path has >= 2 points and its note has been created — every point
+			 *  added after that is written straight to this file, so the drawing preview is
+			 *  never out of sync with the note on disk. */
+			file: TFile | null;
 	  }
 	| {
 			mode: "editing";
 			path: PathData;
-			sub: EditSub;
-			insertAt: number | null;
-			addAtStart: boolean;
+			pendingEnd: "start" | "end" | null;
 			confirmDelete: boolean;
 	  };
 
@@ -50,6 +52,9 @@ export class PathTool {
 	private pathsFolder: TFolder | null = null;
 	private pathsList: PathData[] = [];
 	private state: PathToolState = { mode: "idle" };
+	/** In-flight file-creation for the current drawing session, so two points added in quick
+	 *  succession (before the first vault.create() resolves) don't both try to create the file. */
+	private drawingFilePromise: Promise<TFile> | null = null;
 
 	constructor(
 		private app: App,
@@ -81,9 +86,24 @@ export class PathTool {
 		return this.layer.isVisible;
 	}
 
-	/** Abandons whatever the Path tool is doing (drawing/editing) and returns to idle. */
+	/**
+	 * Abandons whatever the Path tool is doing and returns to idle. A path being drawn is
+	 * already saved to disk once it has 2+ points (nothing to undo), so this just needs to
+	 * fold it into the in-memory paths list — otherwise it would keep rendering as the
+	 * "in progress" preview instead of a normal path until the block is fully re-rendered.
+	 */
 	reset(): void {
-		const hadState = this.state.mode !== "idle";
+		const state = this.state;
+		if (state.mode === "drawing" && state.file) {
+			this.pathsList.push({
+				notePath: state.file.path,
+				name: state.file.basename,
+				type: state.type,
+				hexes: [...state.hexes],
+			});
+		}
+		this.drawingFilePromise = null;
+		const hadState = state.mode !== "idle";
 		this.state = { mode: "idle" };
 		if (hadState) this.render();
 	}
@@ -93,6 +113,8 @@ export class PathTool {
 			this.pathsList,
 			this.state,
 			(path, index, q, r) => void this.movePathPoint(path, index, q, r),
+			(path, insertAt, q, r) => void this.insertPathPoint(path, insertAt, q, r),
+			(path, index) => void this.removePathPoint(path, index),
 		);
 	}
 
@@ -113,9 +135,7 @@ export class PathTool {
 				this.state = {
 					mode: "editing",
 					path: found,
-					sub: "move",
-					insertAt: null,
-					addAtStart: false,
+					pendingEnd: null,
 					confirmDelete: false,
 				};
 				this.render();
@@ -136,30 +156,22 @@ export class PathTool {
 			if (edge && edge.q === q && edge.r === r) return;
 			if (state.prependNext) state.hexes.unshift({ q, r });
 			else state.hexes.push({ q, r });
+			void this.persistDrawingPoint(state);
 			this.render();
 			this.refreshDrawer();
 			return;
 		}
 
-		if (state.mode === "editing" && state.sub === "remove") {
-			const marker = hit.closest(".hexcrawl-path-marker");
-			const idx = marker ? Number(marker.getAttribute("data-index")) : NaN;
-			if (Number.isInteger(idx)) void this.removePathPoint(state, idx);
-			return;
-		}
-
-		if (state.mode === "editing" && state.sub === "add") {
-			const addMarker = hit.closest(".hexcrawl-path-marker-add");
-			if (addMarker) {
-				state.insertAt = Number(addMarker.getAttribute("data-insert-at"));
-				return;
-			}
+		if (state.mode === "editing" && state.pendingEnd) {
 			const hexEl = hit.closest(".hexcrawl-hex");
 			if (!(hexEl instanceof HTMLElement)) return;
 			const q = Number(hexEl.getAttribute("data-q"));
 			const r = Number(hexEl.getAttribute("data-r"));
 			if (!Number.isInteger(q) || !Number.isInteger(r)) return;
-			void this.insertPathPoint(state, q, r);
+			const at = state.pendingEnd === "start" ? 0 : state.path.hexes.length;
+			state.pendingEnd = null;
+			void this.insertPathPoint(state.path, at, q, r);
+			this.refreshDrawer();
 		}
 	}
 
@@ -182,12 +194,6 @@ export class PathTool {
 		}
 
 		if (state.mode === "drawing") {
-			const { previewEl: cancelPreview } = createDrawerItem(
-				scrollEl,
-				"Cancel",
-				() => this.cancelPathTool(),
-			);
-			setIcon(cancelPreview, "x");
 			const { previewEl: dirPreview } = createDrawerItem(
 				scrollEl,
 				state.prependNext ? "Add at Start" : "Add at End",
@@ -197,18 +203,8 @@ export class PathTool {
 				},
 			);
 			setIcon(dirPreview, state.prependNext ? "arrow-left" : "arrow-right");
-			if (state.hexes.length >= 2) {
-				const { previewEl: finishPreview } = createDrawerItem(
-					scrollEl,
-					"Finish",
-					() => {
-						void this.createPathFromDrawing(state.type, state.hexes);
-					},
-				);
-				setIcon(finishPreview, "check");
-			} else {
+			if (state.hexes.length < 2)
 				renderDrawerEmpty(scrollEl, "Click hexes to add points…");
-			}
 			return;
 		}
 
@@ -235,37 +231,6 @@ export class PathTool {
 			return;
 		}
 
-		const subs: { kind: EditSub; icon: string; label: string }[] = [
-			{ kind: "move", icon: "move", label: "Move" },
-			{ kind: "add", icon: "circle-plus", label: "Add" },
-			{ kind: "remove", icon: "circle-minus", label: "Remove" },
-		];
-		for (const sub of subs) {
-			const { itemEl, previewEl } = createDrawerItem(
-				scrollEl,
-				sub.label,
-				() => {
-					state.sub = sub.kind;
-					state.insertAt = null;
-					state.addAtStart = false;
-					this.render();
-					this.refreshDrawer();
-				},
-			);
-			setIcon(previewEl, sub.icon);
-			if (state.sub === sub.kind) itemEl.addClass("is-selected");
-		}
-		if (state.sub === "add") {
-			const { previewEl: dirPreview } = createDrawerItem(
-				scrollEl,
-				state.addAtStart ? "Add at Start" : "Add at End",
-				() => {
-					state.addAtStart = !state.addAtStart;
-					this.refreshDrawer();
-				},
-			);
-			setIcon(dirPreview, state.addAtStart ? "arrow-left" : "arrow-right");
-		}
 		const { previewEl: delPreview } = createDrawerItem(
 			scrollEl,
 			"Delete Path",
@@ -275,17 +240,37 @@ export class PathTool {
 			},
 		);
 		setIcon(delPreview, "trash-2");
+
+		const { previewEl: startPreview } = createDrawerItem(
+			scrollEl,
+			"Add to Start",
+			() => {
+				state.pendingEnd = "start";
+			},
+		);
+		setIcon(startPreview, "arrow-left");
+
+		const { previewEl: endPreview } = createDrawerItem(
+			scrollEl,
+			"Add to End",
+			() => {
+				state.pendingEnd = "end";
+			},
+		);
+		setIcon(endPreview, "arrow-right");
+
+		renderDrawerEmpty(scrollEl, "RMB to delete point");
 	}
 
 	private startDrawingPath(type: string | undefined): void {
-		this.state = { mode: "drawing", type, hexes: [], prependNext: false };
-		this.render();
-		this.refreshDrawer();
-	}
-
-	/** Abandons the in-progress new path and returns to idle. */
-	private cancelPathTool(): void {
-		this.state = { mode: "idle" };
+		this.drawingFilePromise = null;
+		this.state = {
+			mode: "drawing",
+			type,
+			hexes: [],
+			prependNext: false,
+			file: null,
+		};
 		this.render();
 		this.refreshDrawer();
 	}
@@ -297,13 +282,32 @@ export class PathTool {
 		return `Path ${n}`;
 	}
 
-	/** Creates the note for a finished new path, named from the default template — rename the note itself to change it. */
-	private async createPathFromDrawing(
-		type: string | undefined,
-		hexes: HexCoord[],
+	/**
+	 * Writes the current drawing state's points to disk — creating the note (named from the
+	 * default template; rename the note itself to change it) the first time it has 2+ points,
+	 * and just updating path-hexes on every point after that.
+	 */
+	private async persistDrawingPoint(
+		state: Extract<PathToolState, { mode: "drawing" }>,
 	): Promise<void> {
-		if (!this.pathsFolder) return;
-		const folder = this.pathsFolder;
+		if (state.hexes.length < 2 || !this.pathsFolder) return;
+		if (!state.file) {
+			if (!this.drawingFilePromise)
+				this.drawingFilePromise = this.createDrawingFile(
+					this.pathsFolder,
+					state,
+				);
+			// Awaited by every point added while creation is still in flight, so each of
+			// them falls through to the write below instead of silently dropping its point.
+			state.file = await this.drawingFilePromise;
+		}
+		await this.writePathHexes(state.file, state.hexes);
+	}
+
+	private async createDrawingFile(
+		folder: TFolder,
+		state: Extract<PathToolState, { mode: "drawing" }>,
+	): Promise<TFile> {
 		const fileName = uniqueFileName(
 			this.nextDefaultPathName(),
 			(candidate) =>
@@ -314,21 +318,12 @@ export class PathTool {
 		const path = normalizePath(`${folder.path}/${fileName}.md`);
 
 		const lines = ["---"];
-		if (type) lines.push(`path-type: ${JSON.stringify(type)}`);
+		if (state.type) lines.push(`path-type: ${JSON.stringify(state.type)}`);
 		lines.push("path-hexes:");
-		for (const h of hexes) lines.push(`  - [${h.q}, ${h.r}]`);
+		for (const h of state.hexes) lines.push(`  - [${h.q}, ${h.r}]`);
 		lines.push("---", "");
 
-		const file = await this.app.vault.create(path, lines.join("\n"));
-		this.pathsList.push({
-			notePath: file.path,
-			name: file.basename,
-			type,
-			hexes: [...hexes],
-		});
-		this.state = { mode: "idle" };
-		this.render();
-		this.refreshDrawer();
+		return this.app.vault.create(path, lines.join("\n"));
 	}
 
 	private async deleteSelectedPath(path: PathData): Promise<void> {
@@ -352,40 +347,39 @@ export class PathTool {
 	}
 
 	private async insertPathPoint(
-		state: Extract<PathToolState, { mode: "editing" }>,
+		path: PathData,
+		at: number,
 		q: number,
 		r: number,
 	): Promise<void> {
-		const at =
-			state.insertAt ?? (state.addAtStart ? 0 : state.path.hexes.length);
-		state.path.hexes.splice(at, 0, { q, r });
-		state.insertAt = null;
-		await this.savePathHexes(state.path);
+		path.hexes.splice(at, 0, { q, r });
+		await this.savePathHexes(path);
 		this.render();
 	}
 
-	private async removePathPoint(
-		state: Extract<PathToolState, { mode: "editing" }>,
-		index: number,
-	): Promise<void> {
-		if (state.path.hexes.length <= 2) {
+	private async removePathPoint(path: PathData, index: number): Promise<void> {
+		if (path.hexes.length <= 2) {
 			new Notice(
 				"A path needs at least 2 points — use Delete Path to remove it entirely.",
 			);
 			return;
 		}
-		state.path.hexes.splice(index, 1);
-		await this.savePathHexes(state.path);
+		path.hexes.splice(index, 1);
+		await this.savePathHexes(path);
 		this.render();
 	}
 
 	private async savePathHexes(path: PathData): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(path.notePath);
 		if (!(file instanceof TFile)) return;
+		await this.writePathHexes(file, path.hexes);
+	}
+
+	private async writePathHexes(file: TFile, hexes: HexCoord[]): Promise<void> {
 		await this.app.fileManager.processFrontMatter(
 			file,
 			(fm: Record<string, unknown>) => {
-				fm["path-hexes"] = path.hexes.map((h) => [h.q, h.r]);
+				fm["path-hexes"] = hexes.map((h) => [h.q, h.r]);
 			},
 		);
 	}
