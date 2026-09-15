@@ -29,6 +29,9 @@ export class HexMapRenderer {
 	/** Hex keys with a note-creation currently in flight, so a double-click on the same
 	 *  unconfigured hex can't race two vault.create() calls onto the same new file path. */
 	private pendingCreates = new Set<string>();
+	/** Hex key last painted by the current brush drag gesture, so dragging across a hex
+	 *  doesn't re-fire the write on every pointermove while the pointer sits over it. */
+	private lastPaintedKey: string | null = null;
 
 	private toolbar: Toolbar;
 	private pathTool: PathTool;
@@ -134,6 +137,8 @@ export class HexMapRenderer {
 			viewportEl,
 			totalSize,
 			(e) => this.handleClick(e),
+			() => this.toolbar.activeTool === "brush",
+			(e) => this.paintAt(e),
 		);
 	}
 
@@ -217,6 +222,29 @@ export class HexMapRenderer {
 		if (file instanceof TFile) {
 			void this.app.workspace.getLeaf(true).openFile(file);
 		}
+	}
+
+	/**
+	 * Brush drag-paint: fires on pointerdown and every pointermove while the brush tool is
+	 * active, painting each new hex the pointer crosses into (deduped against the last
+	 * painted hex so holding still over one hex doesn't re-fire the write).
+	 */
+	private paintAt(e: PointerEvent): void {
+		if (e.type === "pointerdown") this.lastPaintedKey = null;
+
+		const hit = document.elementFromPoint(e.clientX, e.clientY);
+		if (!hit) return;
+		const hexEl = hit.closest(".hexcrawl-hex");
+		if (!(hexEl instanceof HTMLElement)) return;
+		const q = Number(hexEl.getAttribute("data-q"));
+		const r = Number(hexEl.getAttribute("data-r"));
+		if (!Number.isInteger(q) || !Number.isInteger(r)) return;
+
+		const key = hexKey(q, r);
+		if (key === this.lastPaintedKey) return;
+		this.lastPaintedKey = key;
+
+		void this.runTool(q, r, "brush", this.toolbar.drawerSelection);
 	}
 
 	private async runTool(

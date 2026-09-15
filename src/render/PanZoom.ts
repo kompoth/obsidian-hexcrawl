@@ -5,7 +5,12 @@ const MAX_SCALE = 5;
 const ZOOM_STEP = 1.1;
 const DRAG_THRESHOLD = 5;
 
-/** Wires wheel-zoom and drag-to-pan onto clipEl/viewportEl; a plain (non-drag) click fires onClick. */
+/**
+ * Wires wheel-zoom and drag-to-pan onto clipEl/viewportEl; a plain (non-drag) click fires
+ * onClick. While isPaintMode() is true, a pointer-down starts painting instead of panning:
+ * onPaint fires on pointerdown and on every subsequent pointermove, letting the caller
+ * paint a continuous line of hexes instead of one hex per click.
+ */
 export function setupPanAndZoom(
 	container: HTMLElement,
 	ctx: MarkdownPostProcessorContext,
@@ -13,6 +18,8 @@ export function setupPanAndZoom(
 	viewportEl: HTMLElement,
 	totalSize: { width: number; height: number },
 	onClick: (e: PointerEvent) => void,
+	isPaintMode: () => boolean,
+	onPaint: (e: PointerEvent) => void,
 ): void {
 	let scale = 1;
 	let panX = 0;
@@ -69,6 +76,7 @@ export function setupPanAndZoom(
 	);
 
 	let dragging = false;
+	let painting = false;
 	let moved = false;
 	let lastX = 0;
 	let lastY = 0;
@@ -79,16 +87,27 @@ export function setupPanAndZoom(
 		// div still works and lets the user drop a copy of a hex (icon or not)
 		// elsewhere on the page. Suppressing it here leaves only our own pan.
 		e.preventDefault();
+		userInteracted = true;
+		clipEl.setPointerCapture(e.pointerId);
+
+		if (isPaintMode()) {
+			painting = true;
+			onPaint(e);
+			return;
+		}
+
 		dragging = true;
 		moved = false;
-		userInteracted = true;
 		lastX = e.clientX;
 		lastY = e.clientY;
 		clipEl.addClass("hexcrawl-dragging");
-		clipEl.setPointerCapture(e.pointerId);
 	});
 
 	clipEl.addEventListener("pointermove", (e: PointerEvent) => {
+		if (painting) {
+			onPaint(e);
+			return;
+		}
 		if (!dragging) return;
 		const dx = e.clientX - lastX;
 		const dy = e.clientY - lastY;
@@ -101,6 +120,10 @@ export function setupPanAndZoom(
 	});
 
 	const endDrag = (e: PointerEvent) => {
+		if (painting) {
+			painting = false;
+			return;
+		}
 		if (!dragging) return;
 		dragging = false;
 		clipEl.removeClass("hexcrawl-dragging");
