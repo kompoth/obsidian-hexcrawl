@@ -20,28 +20,6 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	// Fallback for Obsidian < 1.13.0, which doesn't support getSettingDefinitions().
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-		new Setting(containerEl).setName("Palettes").setHeading();
-		containerEl.createEl("p", {
-			text: PALETTES_DESCRIPTION,
-			cls: "setting-item-description",
-		});
-
-		for (const name of Object.keys(this.plugin.settings.palettes)) {
-			this.renderPaletteRow(new Setting(containerEl), name);
-		}
-
-		new Setting(containerEl).addButton((btn) =>
-			btn
-				.setButtonText("Add palette")
-				.setCta()
-				.onClick(() => this.addPalette()),
-		);
-	}
-
 	getSettingDefinitions(): SettingDefinitionItem[] {
 		return [
 			{
@@ -70,19 +48,9 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 		this.openEditor(name);
 	}
 
-	// Re-renders the tab regardless of which of display()/getSettingDefinitions()
-	// the running Obsidian version rendered from.
-	private refresh(): void {
-		if (typeof this.update === "function") {
-			this.update();
-		} else {
-			this.display();
-		}
-	}
-
 	private openEditor(name: string): void {
 		new PaletteEditModal(this.app, this.plugin, name, () =>
-			this.refresh(),
+			this.update(),
 		).open();
 	}
 
@@ -101,7 +69,7 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 			btn.onClick(() => {
 				this.plugin.settings.defaultPalette = name;
 				void this.plugin.saveSettings();
-				this.refresh();
+				this.update();
 			});
 		});
 		setting.addExtraButton((btn) =>
@@ -123,7 +91,7 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 						JSON.stringify(this.plugin.settings.palettes[name]),
 					) as Palette;
 					void this.plugin.saveSettings();
-					this.refresh();
+					this.update();
 				}),
 		);
 		setting.addExtraButton((btn) => {
@@ -141,7 +109,7 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 					)[0];
 				}
 				void this.plugin.saveSettings();
-				this.refresh();
+				this.update();
 			});
 		});
 	}
