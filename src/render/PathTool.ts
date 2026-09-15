@@ -5,10 +5,10 @@ import type {
 	Palette,
 	PathData,
 	PathStyleEntry,
-} from "./types";
+} from "../types";
 import { hexCenter, sharpPath, smoothPath } from "./hexGeometry";
 import { createDrawerItem, renderDrawerEmpty } from "./Toolbar";
-import { dashArray, parsePathFrontmatter, uniqueFileName } from "./pure";
+import { dashArray, parsePathFrontmatter, uniqueFileName } from "../pure";
 
 export const DEFAULT_PATH_WIDTH = 3;
 const MIN_HITAREA_WIDTH = 14;

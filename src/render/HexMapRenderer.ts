@@ -5,15 +5,15 @@ import {
 	TFile,
 	TFolder,
 } from "obsidian";
-import type { HexCoord, HexcrawlBlockParams, HexNoteData } from "./types";
+import type { HexCoord, HexcrawlBlockParams, HexNoteData } from "../types";
 import {
 	gridBoundingBox,
 	hexCenter,
 	hexKey,
 	hexNeighbors,
 } from "./hexGeometry";
-import { loadHexNotes } from "./dataLoaders";
-import { resolveIconsFolder } from "./pure";
+import { loadHexNotes } from "../dataLoaders";
+import { resolveIconsFolder } from "../pure";
 import { setupPanAndZoom } from "./PanZoom";
 import { createDrawerToggleItem, Toolbar } from "./Toolbar";
 import type { DrawerSelection, ToolKind } from "./Toolbar";

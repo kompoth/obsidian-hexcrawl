@@ -1,10 +1,10 @@
 import { Plugin } from "obsidian";
 import { parseHexcrawlParams } from "./src/params";
-import { HexMapRenderer } from "./src/HexMapRenderer";
+import { HexMapRenderer } from "./src/render/HexMapRenderer";
 import { resolveNamedPalette } from "./src/pure";
-import { getDefaultSettings } from "./src/settings";
-import type { HexcrawlSettings } from "./src/settings";
-import { HexcrawlSettingTab } from "./src/SettingsTab";
+import { getDefaultSettings } from "./src/settings/settings";
+import type { HexcrawlSettings } from "./src/settings/settings";
+import { HexcrawlSettingTab } from "./src/settings/SettingsTab";
 
 export default class HexcrawlPlugin extends Plugin {
 	settings: HexcrawlSettings;

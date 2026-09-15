@@ -4,10 +4,10 @@ import {
 	Setting,
 	type SettingDefinitionItem,
 } from "obsidian";
-import type HexcrawlPlugin from "../main";
+import type HexcrawlPlugin from "../../main";
 import { PaletteEditModal } from "./PaletteEditModal";
-import { uniqueKey } from "./pure";
-import type { Palette } from "./types";
+import { uniqueKey } from "../pure";
+import type { Palette } from "../types";
 
 const PALETTES_DESCRIPTION =
 	"Reference a palette from a block with `palette: <name>`, or omit it to use the default one.";

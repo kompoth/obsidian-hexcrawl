@@ -1,4 +1,4 @@
-import type { Palette } from "./types";
+import type { Palette } from "../types";
 
 export interface HexcrawlSettings {
 	/** Named palette -> definition. Always has at least one entry. */

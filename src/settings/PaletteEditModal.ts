@@ -1,14 +1,14 @@
 import { App, debounce, Modal, Notice, Setting } from "obsidian";
-import type HexcrawlPlugin from "../main";
-import { resolveIcons } from "./dataLoaders";
-import { applyPathPreviewStyle, DEFAULT_PATH_WIDTH } from "./PathTool";
-import { renameKey, uniqueKey } from "./pure";
+import type HexcrawlPlugin from "../../main";
+import { resolveIcons } from "../dataLoaders";
+import { applyPathPreviewStyle, DEFAULT_PATH_WIDTH } from "../render/PathTool";
+import { renameKey, uniqueKey } from "../pure";
 import type {
 	Palette,
 	PathDashStyle,
 	PathStyleEntry,
 	TerrainPaletteEntry,
-} from "./types";
+} from "../types";
 
 const DASH_OPTIONS: PathDashStyle[] = ["solid", "dashed", "dotted"];
 

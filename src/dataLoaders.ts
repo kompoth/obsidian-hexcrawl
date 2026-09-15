@@ -1,7 +1,7 @@
 import { App, normalizePath, TFile, TFolder } from "obsidian";
 import type { HexNoteData } from "./types";
 import { BUNDLED_ICONS } from "./bundledIcons";
-import { hexKey } from "./hexGeometry";
+import { hexKey } from "./render/hexGeometry";
 import { parseHexNoteFrontmatter } from "./pure";
 
 const ICON_EXTENSIONS = new Set(["svg", "png", "jpg", "jpeg", "gif", "webp"]);

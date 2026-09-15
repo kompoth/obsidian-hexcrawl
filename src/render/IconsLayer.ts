@@ -1,8 +1,8 @@
 import { App } from "obsidian";
-import type { HexcrawlBlockParams, HexNoteData } from "./types";
+import type { HexcrawlBlockParams, HexNoteData } from "../types";
 import { hexCenter, hexKey, hexSize } from "./hexGeometry";
-import { resolveIcons } from "./dataLoaders";
-import { resolveIconName } from "./pure";
+import { resolveIcons } from "../dataLoaders";
+import { resolveIconName } from "../pure";
 
 const ICON_SCALE = 0.9;
 

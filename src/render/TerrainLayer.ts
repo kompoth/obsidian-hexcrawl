@@ -1,7 +1,7 @@
 import { setTooltip } from "obsidian";
-import type { HexcrawlBlockParams, HexNoteData } from "./types";
+import type { HexcrawlBlockParams, HexNoteData } from "../types";
 import { hexCenter, hexKey, hexSize } from "./hexGeometry";
-import { resolveHexColor } from "./pure";
+import { resolveHexColor } from "../pure";
 
 /** The hex grid's terrain-color layer — its cells double as the click hit-targets used by tool
  *  painting and note-opening, so this is also where those cells physically live. */

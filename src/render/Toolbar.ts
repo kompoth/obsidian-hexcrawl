@@ -1,7 +1,7 @@
 import { App, setIcon, setTooltip } from "obsidian";
-import type { HexcrawlBlockParams } from "./types";
-import { resolveIcons } from "./dataLoaders";
-import { resolveIconsFolder } from "./pure";
+import type { HexcrawlBlockParams } from "../types";
+import { resolveIcons } from "../dataLoaders";
+import { resolveIconsFolder } from "../pure";
 
 export type ToolKind = "brush" | "bucket" | "icon" | "path" | "layers";
 

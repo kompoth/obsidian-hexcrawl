@@ -4,7 +4,7 @@
  * Pointy-top hexes stagger by row; flat-top hexes stagger by column.
  */
 
-import type { HexCoord, HexOrientation, StaggerOffset } from "./types";
+import type { HexCoord, HexOrientation, StaggerOffset } from "../types";
 
 const SQRT3 = Math.sqrt(3);
 
