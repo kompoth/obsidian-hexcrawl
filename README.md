@@ -2,16 +2,18 @@
 
 Turn a folder of notes into a fully interactive, easily editable hex map. Drop a `hexcrawl` code block into any note, point it at a folder, and every note with `hex-q`/`hex-r` frontmatter becomes a hex on the map. The map itself isn't a static picture: paint terrain, drop icons, and draw paths straight onto it with the built-in toolbar.
 
-![Example hexcrawl](screenshot.png)
+![Example hexcrawl](example.png)
 
 ## Features
 
 - **Notes as hexes** — coordinates live in frontmatter; click a hex to open its note.
-- **Built-in editing toolbar** — fill terrain, place icons, and draw paths directly on the map, with per-layer visibility toggles; every action is saved straight back to the note's frontmatter.
+- **No fixed schema** — add whatever properties your campaign needs instead of being boxed into a predefined set of fields.
+- **No bespoke views** — browse, filter, or query hexes with the tools you already use (Bases, Dataview, search).
 - **Pan & zoom** — scroll to zoom on the cursor, drag to pan, auto-fit on load.
-- **Terrain palettes** — named and reusable from Settings → Hexcrawl, or defined inline per block.
-- **Icons** — point a palette at your own icon folder; override per hex when needed.
-- **Paths** — roads, rivers, borders — straight or smooth splines drawn across hexes.
+- **Editing toolbar** — fill terrain, place icons, draw paths directly on the map, and more.
+- **Customizable visuals** — load third-party icon packs of your choice, define various terrain palettes, configure as many path types as you need.
+
+  A couple of great similar plugins exist for Obsidian too: [Hexmap World Creator](https://github.com/sbuffkin/hexmaker), [Hex Cartographer](https://github.com/taroslord/Hex-Cartographer), [Text Mapper](https://github.com/modality/obsidian-text-mapper). They're more mature, and may fit your use case better. However, Hexcrawl aims to stand out by focusing on flexibility of use and visuals, keeping things simple and staying close to Obsidian's own primitives.
 
 ## Quick start
 
@@ -33,15 +35,6 @@ hex-r: 2 # row (0-based)
 hex-terrain: forest
 ---
 ```
-
-## Alternatives & Inspiration
-
-- Alex Schroeder's [Text Mapper](https://src.alexschroeder.ch/text-mapper.git/) and its [port for Obsidian](https://github.com/modality/obsidian-text-mapper).
-- [Hexmap World Creator](https://github.com/sbuffkin/hexmaker) for Obsidian (`obsidian-hexcrawl` aims to achieve the same results with a bit more straightforward and flexible approach).
-- [The Great Antarctic Hexcrawl pt. 9](https://idraluna-archives.bearblog.dev/the-great-antarctic-hexcrawl-pt-9-cartography-naming-stuff-diversifying-regions-markdown/).
-- [Hexagonal Grids](https://www.redblobgames.com/) by Amit Patel.
-
-This plugin uses the Gnomeyland icons pack by Gregory B. MacKenzie for the default terrain palette (see [Palettes](#palettes)). The Gnomeyland icons are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/).
 
 ## Reference
 
@@ -174,3 +167,10 @@ Install the [pre-commit](https://pre-commit.com/) hook once per clone so typeche
 ```bash
 pre-commit install
 ```
+
+## Inspiration & Credits
+
+- Alex Schroeder's [Text Mapper](https://src.alexschroeder.ch/text-mapper.git/) and its [port for Obsidian](https://github.com/modality/obsidian-text-mapper).
+- [The Great Antarctic Hexcrawl pt. 9](https://idraluna-archives.bearblog.dev/the-great-antarctic-hexcrawl-pt-9-cartography-naming-stuff-diversifying-regions-markdown/).
+- [Hexagonal Grids](https://www.redblobgames.com/) by Amit Patel.
+- This plugin uses the Gnomeyland icons pack by Gregory B. MacKenzie for the default terrain palette (see [Palettes](#palettes)). The Gnomeyland icons are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/).
