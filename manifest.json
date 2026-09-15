@@ -5,5 +5,5 @@
 	"minAppVersion": "1.13.0",
 	"description": "Render zoomable, pannable hexcrawl maps from a folder of hex notes via a `hexcrawl` code block.",
 	"author": "Vasilii Negrebetskii",
-	"isDesktopOnly": false
+	"isDesktopOnly": true
 }
