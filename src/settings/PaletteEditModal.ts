@@ -1,7 +1,7 @@
 import { App, debounce, Modal, Notice, Setting } from "obsidian";
 import type HexcrawlPlugin from "../../main";
 import { resolveIcons } from "../dataLoaders";
-import { applyPathPreviewStyle, DEFAULT_PATH_WIDTH } from "../render/PathTool";
+import { applyPathPreviewStyle, DEFAULT_PATH_WIDTH } from "../render/pathStyle";
 import { renameKey, uniqueKey } from "../naming";
 import type {
 	Palette,

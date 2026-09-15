@@ -1,8 +1,8 @@
 import { App, normalizePath, TFile, TFolder } from "obsidian";
-import type { HexNoteData } from "./types";
+import type { HexNoteData, PathData } from "./types";
 import { BUNDLED_ICONS } from "./bundledIcons";
 import { hexKey } from "./render/hexGeometry";
-import { parseHexNoteFrontmatter } from "./frontmatter";
+import { parseHexNoteFrontmatter, parsePathFrontmatter } from "./frontmatter";
 
 const ICON_EXTENSIONS = new Set(["svg", "png", "jpg", "jpeg", "gif", "webp"]);
 
@@ -25,6 +25,19 @@ export function loadHexNotes(
 		});
 	}
 	return notes;
+}
+
+export function loadPaths(app: App, folder: TFolder): PathData[] {
+	const paths: PathData[] = [];
+	for (const child of folder.children) {
+		if (!(child instanceof TFile) || child.extension !== "md") continue;
+		const frontmatter = app.metadataCache.getFileCache(child)?.frontmatter;
+		if (!frontmatter) continue;
+		const parsed = parsePathFrontmatter(frontmatter);
+		if (!parsed) continue;
+		paths.push({ notePath: child.path, name: child.basename, ...parsed });
+	}
+	return paths;
 }
 
 /**

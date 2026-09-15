@@ -4,41 +4,12 @@ import type {
 	HexcrawlBlockParams,
 	Palette,
 	PathData,
-	PathStyleEntry,
 } from "../types";
-import { hexCenter, sharpPath, smoothPath } from "./hexGeometry";
-import { createDrawerItem, renderDrawerEmpty } from "./Toolbar";
-import { parsePathFrontmatter } from "../frontmatter";
+import { loadPaths } from "../dataLoaders";
 import { uniqueFileName } from "../naming";
-import { dashArray } from "./pathStyle";
-
-export const DEFAULT_PATH_WIDTH = 3;
-const MIN_HITAREA_WIDTH = 14;
-
-/** Renders a path type's color/width/dash onto a preview swatch's top border — shared by the
- *  Path tool's drawer and the palette settings' terrain/path-type previews. */
-export function applyPathPreviewStyle(
-	el: HTMLElement,
-	style: PathStyleEntry,
-): void {
-	el.style.borderTopColor = style.color ?? "var(--text-muted)";
-	el.style.borderTopWidth = `${Math.min(Math.max(style.width ?? DEFAULT_PATH_WIDTH, 1), 6)}px`;
-	el.style.borderTopStyle =
-		style.dash === "dotted" || style.dash === "dashed" ? style.dash : "solid";
-}
-
-export function loadPaths(app: App, folder: TFolder): PathData[] {
-	const paths: PathData[] = [];
-	for (const child of folder.children) {
-		if (!(child instanceof TFile) || child.extension !== "md") continue;
-		const frontmatter = app.metadataCache.getFileCache(child)?.frontmatter;
-		if (!frontmatter) continue;
-		const parsed = parsePathFrontmatter(frontmatter);
-		if (!parsed) continue;
-		paths.push({ notePath: child.path, name: child.basename, ...parsed });
-	}
-	return paths;
-}
+import { PathLayer } from "./PathLayer";
+import { applyPathPreviewStyle } from "./pathStyle";
+import { createDrawerItem, renderDrawerEmpty } from "./Toolbar";
 
 /** Sub-mode when editing an existing path's points. */
 export type EditSub = "move" | "add" | "remove";
@@ -72,49 +43,42 @@ function renderPathTypeItem(
 	applyPathPreviewStyle(lineEl, style);
 }
 
-/** Owns the paths list, their SVG rendering, and the Path tool's own drawer/click state machine. */
+/** Owns the paths list and the Path tool's own drawer/click state machine; delegates SVG
+ *  rendering to its own PathLayer. */
 export class PathTool {
+	private layer: PathLayer;
 	private pathsFolder: TFolder | null = null;
 	private pathsList: PathData[] = [];
-	private pathsSvg: SVGSVGElement | null = null;
-	private gutter = 0;
 	private state: PathToolState = { mode: "idle" };
-	private visible = true;
 
 	constructor(
 		private app: App,
 		private params: HexcrawlBlockParams,
 		private refreshDrawer: () => void,
-	) {}
+	) {
+		this.layer = new PathLayer(params);
+	}
 
 	load(folder: TFolder | null): void {
 		this.pathsFolder = folder;
 		this.pathsList = folder ? loadPaths(this.app, folder) : [];
 	}
 
-	/** Creates the paths layer's own SVG under viewportEl (always, even with zero paths yet, so the
-	 *  Path tool can add the map's first path without a full grid re-render) and does the initial render. */
 	mount(
 		viewportEl: HTMLElement,
 		gutter: number,
 		totalSize: { width: number; height: number },
 	): void {
-		this.pathsSvg = viewportEl.createSvg("svg", {
-			cls: ["hexcrawl-layer", "hexcrawl-paths"],
-			attr: { width: totalSize.width, height: totalSize.height },
-		});
-		this.pathsSvg.style.display = this.visible ? "" : "none";
-		this.gutter = gutter;
+		this.layer.mount(viewportEl, gutter, totalSize);
 		this.render();
 	}
 
 	setVisible(visible: boolean): void {
-		this.visible = visible;
-		if (this.pathsSvg) this.pathsSvg.style.display = visible ? "" : "none";
+		this.layer.setVisible(visible);
 	}
 
 	get isVisible(): boolean {
-		return this.visible;
+		return this.layer.isVisible;
 	}
 
 	/** Abandons whatever the Path tool is doing (drawing/editing) and returns to idle. */
@@ -124,174 +88,12 @@ export class PathTool {
 		if (hadState) this.render();
 	}
 
-	/**
-	 * (Re)draws every path plus, if the Path tool is mid-draw or mid-edit, the in-progress
-	 * preview line and/or point markers — into the persistent pathsSvg. Called after every
-	 * path mutation instead of rebuilding the whole grid, so pan/zoom/tool state survives.
-	 */
 	render(): void {
-		const pathsSvg = this.pathsSvg;
-		if (!pathsSvg) return;
-		pathsSvg.empty();
-		const { orientation, hexSize: radius, palette, stagger } = this.params;
-		const gutter = this.gutter;
-		const toPt = (h: HexCoord) => {
-			const c = hexCenter(h.q, h.r, orientation, radius, stagger);
-			return { cx: gutter + c.cx, cy: gutter + c.cy };
-		};
-
-		for (const path of this.pathsList) {
-			const points = path.hexes.map(toPt);
-			const style = path.type ? palette?.paths[path.type] : undefined;
-			const spline = path.spline ?? style?.spline ?? false;
-			const d = spline ? smoothPath(points) : sharpPath(points);
-			const width = style?.width ?? DEFAULT_PATH_WIDTH;
-
-			const pathEl = pathsSvg.createSvg("path", {
-				cls: path.type
-					? ["hexcrawl-path", `hexcrawl-path-${path.type}`]
-					: "hexcrawl-path",
-				attr: { d, fill: "none", "data-note-path": path.notePath },
-			});
-			const color = style?.color ?? path.type;
-			if (color) pathEl.style.stroke = color;
-			if (style?.width) pathEl.style.strokeWidth = String(style.width);
-			if (style?.dash)
-				pathEl.style.strokeDasharray = dashArray(style.dash, width);
-			if (!path.name.startsWith("_"))
-				pathEl.createSvg("title").textContent = path.name;
-
-			// Wider, invisible sibling so a thin/dashed line is still easy to click/select.
-			const hitEl = pathsSvg.createSvg("path", {
-				cls: "hexcrawl-path-hitarea",
-				attr: { d, fill: "none", "data-note-path": path.notePath },
-			});
-			hitEl.style.strokeWidth = String(Math.max(width, MIN_HITAREA_WIDTH));
-		}
-
-		const state = this.state;
-
-		if (state.mode === "drawing") {
-			const points = state.hexes.map(toPt);
-			if (points.length >= 2) {
-				const style = state.type ? palette?.paths[state.type] : undefined;
-				const width = style?.width ?? DEFAULT_PATH_WIDTH;
-				const d = style?.spline ? smoothPath(points) : sharpPath(points);
-				const previewEl = pathsSvg.createSvg("path", {
-					cls: "hexcrawl-path-preview",
-					attr: { d, fill: "none" },
-				});
-				if (style?.color) previewEl.style.stroke = style.color;
-				if (style?.width) previewEl.style.strokeWidth = String(style.width);
-				previewEl.style.strokeDasharray = style?.dash
-					? dashArray(style.dash, width)
-					: "none";
-			}
-			for (const p of points) {
-				pathsSvg.createSvg("circle", {
-					cls: "hexcrawl-path-marker",
-					attr: { cx: String(p.cx), cy: String(p.cy), r: "5" },
-				});
-			}
-		}
-
-		if (state.mode === "editing") {
-			const points = state.path.hexes.map(toPt);
-			points.forEach((p, i) => {
-				const marker = pathsSvg.createSvg("circle", {
-					cls: "hexcrawl-path-marker",
-					attr: {
-						cx: String(p.cx),
-						cy: String(p.cy),
-						r: "6",
-						"data-index": String(i),
-					},
-				});
-				if (state.sub === "move") this.attachMarkerDrag(marker, state.path, i);
-			});
-			if (state.sub === "add") {
-				for (let i = 0; i < points.length - 1; i++) {
-					const mx = (points[i].cx + points[i + 1].cx) / 2;
-					const my = (points[i].cy + points[i + 1].cy) / 2;
-					pathsSvg.createSvg("circle", {
-						cls: "hexcrawl-path-marker-add",
-						attr: {
-							cx: String(mx),
-							cy: String(my),
-							r: "4",
-							"data-insert-at": String(i + 1),
-						},
-					});
-				}
-				// Extrapolated markers just beyond each end, for prepending/appending a point.
-				if (points.length >= 2) {
-					const first = points[0];
-					const second = points[1];
-					pathsSvg.createSvg("circle", {
-						cls: "hexcrawl-path-marker-add",
-						attr: {
-							cx: String(first.cx + (first.cx - second.cx) * 0.5),
-							cy: String(first.cy + (first.cy - second.cy) * 0.5),
-							r: "4",
-							"data-insert-at": "0",
-						},
-					});
-					const last = points[points.length - 1];
-					const secondLast = points[points.length - 2];
-					pathsSvg.createSvg("circle", {
-						cls: "hexcrawl-path-marker-add",
-						attr: {
-							cx: String(last.cx + (last.cx - secondLast.cx) * 0.5),
-							cy: String(last.cy + (last.cy - secondLast.cy) * 0.5),
-							r: "4",
-							"data-insert-at": String(points.length),
-						},
-					});
-				}
-			}
-		}
-	}
-
-	/** Drag-to-move for a single path point marker; snaps to whichever hex the pointer is over on release. */
-	private attachMarkerDrag(
-		markerEl: SVGCircleElement,
-		path: PathData,
-		index: number,
-	): void {
-		markerEl.addEventListener("pointerdown", (e: PointerEvent) => {
-			e.stopPropagation();
-			e.preventDefault();
-			markerEl.setPointerCapture(e.pointerId);
-			let hoverHex: HTMLElement | null = null;
-
-			const highlight = (ev: PointerEvent) => {
-				const el = document.elementFromPoint(ev.clientX, ev.clientY);
-				const hexEl = el?.closest(".hexcrawl-hex");
-				const next = hexEl instanceof HTMLElement ? hexEl : null;
-				if (next !== hoverHex) {
-					hoverHex?.removeClass("hexcrawl-hex-drop-target");
-					hoverHex = next;
-					hoverHex?.addClass("hexcrawl-hex-drop-target");
-				}
-				return hoverHex;
-			};
-
-			const onMove = (ev: PointerEvent) => highlight(ev);
-			const onUp = (ev: PointerEvent) => {
-				markerEl.removeEventListener("pointermove", onMove);
-				markerEl.removeEventListener("pointerup", onUp);
-				const hexEl = highlight(ev);
-				hexEl?.removeClass("hexcrawl-hex-drop-target");
-				if (hexEl) {
-					const q = Number(hexEl.getAttribute("data-q"));
-					const r = Number(hexEl.getAttribute("data-r"));
-					if (Number.isInteger(q) && Number.isInteger(r))
-						void this.movePathPoint(path, index, q, r);
-				}
-			};
-			markerEl.addEventListener("pointermove", onMove);
-			markerEl.addEventListener("pointerup", onUp);
-		});
+		this.layer.render(
+			this.pathsList,
+			this.state,
+			(path, index, q, r) => void this.movePathPoint(path, index, q, r),
+		);
 	}
 
 	handleClick(hit: Element): void {
