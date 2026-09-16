@@ -77,7 +77,7 @@ export function parseBorderFrontmatter(
 
 	const pairs: [HexCoord, HexCoord][] = [];
 	for (let i = 0; i < hexesRaw.length; i++) {
-		const pairRaw = hexesRaw[i];
+		const pairRaw: unknown = hexesRaw[i];
 		if (!Array.isArray(pairRaw) || pairRaw.length !== 2) {
 			return {
 				ok: false,
