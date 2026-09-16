@@ -4,9 +4,10 @@ import {
 	hexCenter,
 	hexNeighbors,
 	hexSize,
+	hexVertices,
 	sharpPath,
 	smoothPath,
-} from "./hexGeometry";
+} from "../src/render/hexGeometry";
 
 describe("hexSize", () => {
 	it("flat-top: width is 2R, height is √3·R", () => {
@@ -62,6 +63,44 @@ describe("hexNeighbors", () => {
 		const unshifted = hexNeighbors(2, 2, "pointy", "odd");
 		const shifted = hexNeighbors(2, 3, "pointy", "odd");
 		expect(unshifted).not.toEqual(shifted);
+	});
+});
+
+describe("hexVertices", () => {
+	// Matches the .hexcrawl-hex-pointy/-flat clip-path polygon percentages in styles.css,
+	// applied to a hex centered at (0,0) with radius R.
+	const R = 10;
+	const S = (Math.sqrt(3) * R) / 2;
+
+	it("pointy-top: top, upper-right, lower-right, bottom, lower-left, upper-left", () => {
+		expect(hexVertices(0, 0, "pointy", R)).toEqual([
+			{ cx: 0, cy: -R },
+			{ cx: S, cy: -R / 2 },
+			{ cx: S, cy: R / 2 },
+			{ cx: 0, cy: R },
+			{ cx: -S, cy: R / 2 },
+			{ cx: -S, cy: -R / 2 },
+		]);
+	});
+
+	it("flat-top: upper-left, upper-right, right, lower-right, lower-left, left", () => {
+		expect(hexVertices(0, 0, "flat", R)).toEqual([
+			{ cx: -R / 2, cy: -S },
+			{ cx: R / 2, cy: -S },
+			{ cx: R, cy: 0 },
+			{ cx: R / 2, cy: S },
+			{ cx: -R / 2, cy: S },
+			{ cx: -R, cy: 0 },
+		]);
+	});
+
+	it("is offset by the hex's own center", () => {
+		const atOrigin = hexVertices(0, 0, "pointy", R);
+		const shifted = hexVertices(5, 7, "pointy", R);
+		shifted.forEach((v, i) => {
+			expect(v.cx).toBeCloseTo(atOrigin[i].cx + 5);
+			expect(v.cy).toBeCloseTo(atOrigin[i].cy + 7);
+		});
 	});
 });
 

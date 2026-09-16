@@ -1,13 +1,19 @@
 import { App } from "obsidian";
-import type { HexcrawlBlockParams, HexNoteData } from "./types";
+import type { HexcrawlBlockParams, HexNoteData } from "../types";
 import { hexCenter, hexKey, hexSize } from "./hexGeometry";
-import { resolveIcons } from "./dataLoaders";
-import { resolveIconName } from "./pure";
+import { resolveIcons } from "../dataLoaders";
+import { resolveIconsFolder, resolveGmIconName } from "../palette";
 
 const ICON_SCALE = 0.9;
+/** "mini" mode renders the icon at half the size used by "default" mode. */
+const MINI_SCALE = 0.5;
 
-/** Hex icons — from the terrain palette's default, or a hex's own hex-icon override. */
-export class IconsLayer {
+/**
+ * hex-gm-icon — a GM-only icon layer, rendered above everything else (terrain, paths, icons).
+ * Looks up icon names in the same icon set as the regular icon layer, but with no palette
+ * fallback: a hex only shows a GM icon if its note sets hex-gm-icon directly.
+ */
+export class GmIconsLayer {
 	private el: HTMLElement | null = null;
 	private iconElements = new Map<string, HTMLImageElement>();
 	private iconSrcs: Map<string, string> = new Map();
@@ -19,21 +25,20 @@ export class IconsLayer {
 		private params: HexcrawlBlockParams,
 	) {}
 
-	async load(iconsFolder: string | undefined): Promise<void> {
-		this.iconSrcs = await resolveIcons(this.app, iconsFolder);
+	async load(): Promise<void> {
+		this.iconSrcs = await resolveIcons(
+			this.app,
+			resolveIconsFolder(this.params),
+		);
 	}
 
-	/**
-	 * `totalSize` must be set explicitly: this layer's own children are all `position: absolute`,
-	 * so without a declared size it collapses to shrink-to-fit-of-nothing (0×0) — which some themes'
-	 * global `img { max-width: 100% }` rules then clamp every icon `<img>` down to (0% of 0).
-	 */
+	/** See IconsLayer.mount for why `totalSize` must be set explicitly. */
 	mount(
 		viewportEl: HTMLElement,
 		totalSize: { width: number; height: number },
 	): void {
 		this.el = viewportEl.createDiv({
-			cls: ["hexcrawl-layer", "hexcrawl-layer-icons"],
+			cls: ["hexcrawl-layer", "hexcrawl-layer-gm-icons"],
 		});
 		this.el.style.width = `${totalSize.width}px`;
 		this.el.style.height = `${totalSize.height}px`;
@@ -53,21 +58,14 @@ export class IconsLayer {
 		const el = this.el;
 		if (!el) return;
 		this.gutter = gutter;
-		const {
-			orientation,
-			stagger,
-			hexSize: radius,
-			cols,
-			rows,
-			palette,
-		} = this.params;
+		const { orientation, stagger, hexSize: radius, cols, rows } = this.params;
 		const { w: hexW, h: hexH } = hexSize(radius, orientation);
 
 		for (let r = 0; r < rows; r++) {
 			for (let q = 0; q < cols; q++) {
 				const key = hexKey(q, r);
 				const note = hexNotes.get(key);
-				const iconName = resolveIconName(note, palette);
+				const iconName = resolveGmIconName(note);
 				if (!iconName) continue;
 				const iconSrc = this.iconSrcs.get(iconName);
 				if (!iconSrc) continue;
@@ -86,13 +84,13 @@ export class IconsLayer {
 		}
 	}
 
-	/** Re-derives one hex's icon (add/update/remove) from its current note data. */
-	updateHex(q: number, r: number, note: HexNoteData): void {
+	/** Re-derives one hex's GM icon (add/update/remove) from its current note data. */
+	updateHex(q: number, r: number, note: HexNoteData | undefined): void {
 		const el = this.el;
 		if (!el) return;
 		const key = hexKey(q, r);
-		const { orientation, stagger, hexSize: radius, palette } = this.params;
-		const iconName = resolveIconName(note, palette);
+		const { orientation, stagger, hexSize: radius } = this.params;
+		const iconName = resolveGmIconName(note);
 		const iconSrc = iconName ? this.iconSrcs.get(iconName) : undefined;
 		const iconEl = this.iconElements.get(key);
 
@@ -115,6 +113,33 @@ export class IconsLayer {
 		}
 	}
 
+	/**
+	 * "default" mode places the icon at hex center like a regular icon; "mini" mode shrinks it
+	 * to half that size and shifts its center toward the hex's top-left sector.
+	 */
+	private layout(
+		cx: number,
+		cy: number,
+		hexW: number,
+		hexH: number,
+	): { iconW: number; iconH: number; left: number; top: number } {
+		const iconW = hexW * ICON_SCALE;
+		const iconH = hexH * ICON_SCALE;
+		if (this.params.gmIconMode !== "mini") {
+			return { iconW, iconH, left: cx - iconW / 2, top: cy - iconH / 2 };
+		}
+		const miniW = iconW * MINI_SCALE;
+		const miniH = iconH * MINI_SCALE;
+		const miniCx = cx - hexW / 4;
+		const miniCy = cy - hexH / 4;
+		return {
+			iconW: miniW,
+			iconH: miniH,
+			left: miniCx - miniW / 2,
+			top: miniCy - miniH / 2,
+		};
+	}
+
 	private placeIcon(
 		container: HTMLElement,
 		key: string,
@@ -125,19 +150,18 @@ export class IconsLayer {
 		hexW: number,
 		hexH: number,
 	): void {
-		const iconW = hexW * ICON_SCALE;
-		const iconH = hexH * ICON_SCALE;
 		let iconEl = this.iconElements.get(key);
 
 		if (!iconEl) {
+			const { iconW, iconH, left, top } = this.layout(cx, cy, hexW, hexH);
 			iconEl = container.createEl("img", { cls: "hexcrawl-hex-icon" });
 			iconEl.draggable = false;
 			iconEl.tabIndex = -1;
 			iconEl.addEventListener("dragstart", (e) => e.preventDefault());
 			iconEl.style.width = `${iconW}px`;
 			iconEl.style.height = `${iconH}px`;
-			iconEl.style.left = `${cx - iconW / 2}px`;
-			iconEl.style.top = `${cy - iconH / 2}px`;
+			iconEl.style.left = `${left}px`;
+			iconEl.style.top = `${top}px`;
 			this.iconElements.set(key, iconEl);
 		}
 		iconEl.src = src;

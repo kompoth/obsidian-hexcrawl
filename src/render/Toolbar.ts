@@ -1,19 +1,22 @@
 import { App, setIcon, setTooltip } from "obsidian";
-import type { HexcrawlBlockParams } from "./types";
-import { resolveIcons } from "./dataLoaders";
-import { resolveIconsFolder } from "./pure";
+import type { HexcrawlBlockParams } from "../types";
+import { resolveIcons } from "../dataLoaders";
+import { resolveIconsFolder } from "../palette";
 
-export type ToolKind = "brush" | "bucket" | "icon" | "path" | "layers";
+export type ToolKind =
+	"brush" | "bucket" | "icon" | "gm-icon" | "path" | "border" | "layers";
 
 /** What's currently picked in the drawer: the eraser, or a named palette/icon value. */
 export type DrawerSelection = { erase: true } | { erase: false; value: string };
 
 /** Toolbar tools, top to bottom. */
 const TOOLS: { kind: ToolKind; icon: string; label: string }[] = [
-	{ kind: "brush", icon: "paintbrush", label: "Brush" },
+	{ kind: "brush", icon: "hexagon", label: "Brush" },
 	{ kind: "bucket", icon: "paint-bucket", label: "Bucket" },
-	{ kind: "icon", icon: "image", label: "Icon" },
+	{ kind: "icon", icon: "flag", label: "Icon" },
+	{ kind: "gm-icon", icon: "hat-glasses", label: "GM Icon" },
 	{ kind: "path", icon: "route", label: "Path" },
+	{ kind: "border", icon: "fence", label: "Border" },
 	{ kind: "layers", icon: "layers", label: "Layers" },
 ];
 
@@ -99,6 +102,8 @@ interface ToolbarHooks {
 	onToolChange: (kind: ToolKind | null) => void;
 	/** Delegate for populating the Path tool's own drawer content. */
 	populatePathDrawer: (scrollEl: HTMLElement) => void;
+	/** Delegate for populating the Border tool's own drawer content. */
+	populateBorderDrawer: (scrollEl: HTMLElement) => void;
 	/** Delegate for populating the Layers tool's own drawer content. */
 	populateLayersDrawer: (scrollEl: HTMLElement) => void;
 }
@@ -108,6 +113,9 @@ export class Toolbar {
 	private _activeTool: ToolKind | null = null;
 	private _drawerSelection: DrawerSelection | null = null;
 	private scrollEl: HTMLElement | null = null;
+	private drawerEl: HTMLElement | null = null;
+	private clipEl: HTMLElement | null = null;
+	private buttons: HTMLElement[] = [];
 	/** Bumped on every populateDrawer() call so a stale async populate (from a tool switch
 	 *  mid-flight) can detect it's no longer current and skip rendering into the drawer. */
 	private drawerRenderId = 0;
@@ -135,11 +143,20 @@ export class Toolbar {
 		const drawerEl = clipEl.createDiv({ cls: "hexcrawl-drawer" });
 		drawerEl.hidden = true;
 		drawerEl.addEventListener("pointerdown", (e) => e.stopPropagation());
-		drawerEl.addEventListener("wheel", (e) => e.stopPropagation());
 		const scrollEl = drawerEl.createDiv({ cls: "hexcrawl-drawer-scroll" });
+		drawerEl.addEventListener("wheel", (e: WheelEvent) => {
+			e.stopPropagation();
+			// The drawer only ever scrolls horizontally (overflow-x: auto, overflow-y:
+			// hidden), which an ordinary mouse wheel's vertical delta doesn't drive on its
+			// own — only Shift+wheel or a trackpad's native horizontal gesture would. Redirect
+			// the vertical delta into horizontal scroll so a plain wheel works too.
+			e.preventDefault();
+			scrollEl.scrollLeft += e.deltaY || e.deltaX;
+		});
 		this.scrollEl = scrollEl;
+		this.drawerEl = drawerEl;
+		this.clipEl = clipEl;
 
-		const buttons: HTMLElement[] = [];
 		for (const tool of TOOLS) {
 			const btn = toolbarEl.createDiv({
 				cls: "hexcrawl-tool-btn",
@@ -155,24 +172,40 @@ export class Toolbar {
 				}
 			});
 			btn.addEventListener("click", () => {
-				const wasActive = btn.hasClass("is-active");
-				for (const other of buttons) {
+				if (btn.hasClass("is-active")) {
+					this.deactivate();
+					return;
+				}
+				for (const other of this.buttons) {
 					other.removeClass("is-active");
 					other.setAttr("aria-pressed", "false");
 				}
-				const nowActive = !wasActive;
-				if (nowActive) {
-					btn.addClass("is-active");
-					btn.setAttr("aria-pressed", "true");
-				}
-				drawerEl.hidden = !nowActive;
-				this._activeTool = nowActive ? tool.kind : null;
+				btn.addClass("is-active");
+				btn.setAttr("aria-pressed", "true");
+				drawerEl.hidden = false;
+				this._activeTool = tool.kind;
 				this._drawerSelection = null;
 				this.hooks.onToolChange(this._activeTool);
-				if (nowActive) this.populateDrawer(scrollEl, tool.kind);
+				this.populateDrawer(scrollEl, tool.kind);
 			});
-			buttons.push(btn);
+			this.buttons.push(btn);
 		}
+	}
+
+	/** Turns off whichever tool is active and hides the drawer — shared by a tool button
+	 *  toggling itself off and by the drawer's own "Exit" item. */
+	private deactivate(): void {
+		for (const btn of this.buttons) {
+			btn.removeClass("is-active");
+			btn.setAttr("aria-pressed", "false");
+		}
+		if (this.drawerEl) this.drawerEl.hidden = true;
+		this._activeTool = null;
+		this._drawerSelection = null;
+		this.hooks.onToolChange(null);
+		// Hiding the drawer blurs a focused item inside it (e.g. this "Exit" click itself)
+		// out to <body> — reclaim focus so the map's undo/redo shortcut keeps working.
+		this.clipEl?.focus();
 	}
 
 	/** Re-renders the drawer for whichever tool is currently active — used after Path-tool state changes. */
@@ -183,23 +216,43 @@ export class Toolbar {
 
 	private populateDrawer(scrollEl: HTMLElement, kind: ToolKind): void {
 		scrollEl.empty();
+		// Emptying can blur a focused drawer item (e.g. "Confirm Delete", just clicked) out
+		// to <body> — reclaim focus so the map's undo/redo shortcut keeps working afterward.
+		this.clipEl?.focus();
 		const renderId = ++this.drawerRenderId;
-		if (kind === "brush" || kind === "icon") this.addEraserItem(scrollEl);
+		// Added first, not after the tool-specific items, so its position doesn't depend on
+		// the async terrain/icon populates below resolving before or after this runs.
+		this.addExitItem(scrollEl);
+		if (kind === "brush" || kind === "icon" || kind === "gm-icon")
+			this.addEraserItem(scrollEl);
 		switch (kind) {
 			case "brush":
 			case "bucket":
 				void this.populateTerrainDrawer(scrollEl, renderId);
 				break;
 			case "icon":
+			case "gm-icon":
 				void this.populateIconDrawer(scrollEl, renderId);
 				break;
 			case "path":
 				this.hooks.populatePathDrawer(scrollEl);
 				break;
+			case "border":
+				this.hooks.populateBorderDrawer(scrollEl);
+				break;
 			case "layers":
 				this.hooks.populateLayersDrawer(scrollEl);
 				break;
 		}
+	}
+
+	/** Returns to default mode without undoing any already-completed edits. */
+	private addExitItem(scrollEl: HTMLElement): void {
+		const { previewEl } = createDrawerItem(scrollEl, "Exit", () =>
+			this.deactivate(),
+		);
+		setIcon(previewEl, "log-out");
+		previewEl.addClass("is-danger");
 	}
 
 	private addEraserItem(scrollEl: HTMLElement): void {

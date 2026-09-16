@@ -1,17 +1,21 @@
 # Obsidian Hexcrawl
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/kmicic)
+
 Turn a folder of notes into a fully interactive, easily editable hex map. Drop a `hexcrawl` code block into any note, point it at a folder, and every note with `hex-q`/`hex-r` frontmatter becomes a hex on the map. The map itself isn't a static picture: paint terrain, drop icons, and draw paths straight onto it with the built-in toolbar.
 
-![Example hexcrawl](screenshot.png)
+![Example hexcrawl](media/example.png)
 
 ## Features
 
 - **Notes as hexes** — coordinates live in frontmatter; click a hex to open its note.
-- **Built-in editing toolbar** — fill terrain, place icons, and draw paths directly on the map, with per-layer visibility toggles; every action is saved straight back to the note's frontmatter.
+- **No fixed schema** — add whatever properties your campaign needs instead of being boxed into a predefined set of fields.
+- **No bespoke views** — browse, filter, or query hexes with the tools you already use (Bases, Dataview, search).
 - **Pan & zoom** — scroll to zoom on the cursor, drag to pan, auto-fit on load.
-- **Terrain palettes** — named and reusable from Settings → Hexcrawl, or defined inline per block.
-- **Icons** — point a palette at your own icon folder; override per hex when needed.
-- **Paths** — roads, rivers, borders — straight or smooth splines drawn across hexes.
+- **Editing toolbar** — fill terrain, place icons, draw paths directly on the map, and more.
+- **Customizable visuals** — load third-party icon packs of your choice, define various terrain palettes, configure as many path types as you need.
+
+  A couple of great similar plugins exist for Obsidian too: [Hexmap World Creator](https://github.com/sbuffkin/hexmaker), [Hex Cartographer](https://github.com/taroslord/Hex-Cartographer), [Text Mapper](https://github.com/modality/obsidian-text-mapper). They're more mature, and may fit your use case better. However, Hexcrawl aims to stand out by focusing on flexibility of use and visuals, keeping things simple and staying close to Obsidian's own primitives.
 
 ## Quick start
 
@@ -34,36 +38,21 @@ hex-terrain: forest
 ---
 ```
 
-## Installation
-
-Not yet on the community plugin store. To install manually:
-
-1. Build the plugin (see [Development](#development)).
-2. Copy `main.js`, `manifest.json`, and `styles.css` to `<vault>/.obsidian/plugins/obsidian-hexcrawl/` (or just make a soft link).
-3. Enable **Hexcrawl** under Settings → Community plugins.
-
-## Alternatives & Inspiration
-
-- Alex Schroeder's [Text Mapper](https://src.alexschroeder.ch/text-mapper.git/) and its [port for Obsidian](https://github.com/modality/obsidian-text-mapper).
-- [Hexmap World Creator](https://github.com/sbuffkin/hexmaker) for Obsidian (`obsidian-hexcrawl` aims to achieve the same results with a bit more straightforward and flexible approach).
-- [The Great Antarctic Hexcrawl pt. 9](https://idraluna-archives.bearblog.dev/the-great-antarctic-hexcrawl-pt-9-cartography-naming-stuff-diversifying-regions-markdown/).
-- [Hexagonal Grids](https://www.redblobgames.com/) by Amit Patel.
-
-This plugin uses the Gnomeyland icons pack by Gregory B. MacKenzie for the default terrain palette (see [Palettes](#palettes)). The Gnomeyland icons are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/).
-
 ## Reference
 
 ### Editing on the map
 
 A toolbar pinned to the top-right corner of every rendered map lets you edit it directly, with no frontmatter to hand-write:
 
-| Tool   | What it does                                                                                                    |
-| ------ | --------------------------------------------------------------------------------------------------------------- |
-| Brush  | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it.                                      |
-| Bucket | Flood-fill connected same-terrain hexes with a new one.                                                         |
-| Icon   | Drop an icon from the palette's icon folder onto a hex, or erase it.                                            |
-| Path   | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points. |
-| Layers | Toggle terrain, icons, and paths on or off independently.                                                       |
+| Tool    | What it does                                                                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Brush   | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it.                                                                                                                  |
+| Bucket  | Flood-fill connected same-terrain hexes with a new one.                                                                                                                                     |
+| Icon    | Drop an icon from the palette's icon folder onto a hex, or erase it.                                                                                                                        |
+| GM Icon | Same as Icon, but for `hex-gm-icon` — its own layer, always rendered above everything else.                                                                                                 |
+| Path    | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points.                                                                             |
+| Border  | Draw a new border/barrier by clicking near a shared hex edge to start it, or click an existing border to extend either end (via the add-edge dots) or right-click an end edge to remove it. |
+| Layers  | Toggle terrain, borders, paths, icons, and GM icons on or off independently.                                                                                                                |
 
 Every change is written straight to the affected note's frontmatter (or creates a new path note), so the map and the notes never drift apart.
 
@@ -81,10 +70,12 @@ Every change is written straight to the affected note's frontmatter (or creates 
 | `coords`      | no       | `false`                | Show q/r coordinate labels along the top and left axes.                                                                |
 | `palette`     | no       | default global palette | Name of a global palette (e.g. `palette: Wikipedia`), or an inline mapping for a one-off palette scoped to this block. |
 | `paths`       | no       | —                      | Vault-relative path to a folder of path notes (roads, rivers, ...).                                                    |
+| `borders`     | no       | —                      | Vault-relative path to a folder of border notes (barriers, walls, ...).                                                |
+| `gmIconMode`  | no       | `default`              | How `hex-gm-icon` is rendered: `default` (hex center, like a regular icon) or `mini` (half-size, top-left of the hex). |
 
 ### Palettes
 
-Manage named palettes vault-wide from Settings → Hexcrawl. Add, duplicate, delete, mark a default, and edit each one's terrain/path entries and icons folder (with a picker and live preview). Leave a palette's icons folder empty to use the plugin's bundled icon pack; set one to use only icons from that vault folder instead — the two are never combined.
+Manage named palettes vault-wide from Settings → Hexcrawl. Add, duplicate, delete, mark a default, and edit each one's terrain/path/border entries and icons folder (with a picker and live preview). Leave a palette's icons folder empty to use the plugin's bundled icon pack; set one to use only icons from that vault folder instead — the two are never combined.
 
 A `hexcrawl` block picks one with `palette: <name>`, or omits it to use the default.
 
@@ -107,6 +98,11 @@ palette:
       color: "#4A90C2"
       width: 4
       spline: true
+  borders:
+    barrier:
+      color: "#f50000"
+      width: 4
+      dash: solid
 ```
 
 | Terrain key | Required | Description                                                                                                          |
@@ -121,7 +117,14 @@ palette:
 | `dash`   | no       | `solid`             | `solid`, `dashed`, or `dotted`.                                 |
 | `spline` | no       | `false`             | Smooth curve vs. straight segments, unless a note overrides it. |
 
-`hex-icon` on a note always wins over the palette's icon. A `hex-terrain` or `path-type` with no palette match falls back to being used directly as a CSS color.
+| Border key   | Required | Default             | Description                                                                                    |
+| ------------ | -------- | ------------------- | ---------------------------------------------------------------------------------------------- |
+| `color`      | no       | `var(--text-muted)` | Stroke color.                                                                                  |
+| `width`      | no       | `3`                 | Stroke width in pixels.                                                                        |
+| `dash`       | no       | `solid`             | `solid`, `dashed`, or `dotted`.                                                                |
+| `edgeOffset` | no       | `0`                 | Pixels the edge is shifted toward the first hex of each pair — for building two-sided borders. |
+
+`hex-icon` on a note always wins over the palette's icon. A `hex-terrain`, `path-type`, or `border-type` with no palette match falls back to being used directly as a CSS color.
 
 ### Hex note frontmatter
 
@@ -131,6 +134,7 @@ palette:
 | `hex-r`         | yes      | Row coordinate (integer).                                                                                                                                      |
 | `hex-terrain`   | no       | Looked up against the palette's terrain names; falls back to a literal CSS color (e.g. `#4a7c3f`, `green`) if no match. Omit for an uncolored hex.             |
 | `hex-icon`      | no       | Icon basename (no extension) from the active palette's icons folder (or its bundled pack, if none is set). Overrides the palette's own icon for `hex-terrain`. |
+| `hex-gm-icon`   | no       | Icon basename, looked up the same way as `hex-icon`. Rendered on its own layer, above everything else, per the block's `gmIconMode`.                           |
 
 A note missing or non-integer `hex-q`/`hex-r` is ignored.
 
@@ -155,11 +159,44 @@ path-spline: true
 | `path-type`     | no       | Looked up against the palette's path types; also applied as a CSS class (`hexcrawl-path-{type}`) for custom styling. |
 | `path-spline`   | no       | Overrides the type's default curve/straight rendering for this path.                                                 |
 
-## Development
+### Borders (barriers, walls, etc)
+
+Unlike a path, a border isn't drawn through hex centers — it runs along the shared **edges** between neighboring hexes, which is why `border-hexes` is a list of hex pairs rather than a flat list: each pair names the two hexes on either side of one edge. Consecutive pairs must share exactly one hex, head-to-tail, with the previous pair — this is also what lets a border turn a corner around a single hex, pivoting on it for two edges in a row. Each note is its own border, in the block's `borders` folder, with its title doubling as its name:
+
+```yaml
+---
+border-type: barrier
+border-hexes:
+  - [[0, 0], [1, 1]]
+  - [[1, 1], [0, 1]]
+---
+```
+
+| Frontmatter key | Required | Description                                                                                                                                      |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `border-hexes`  | yes      | Ordered list of hex pairs (at least 1). Each pair's two hexes must be neighbors, and each pair must continue head-to-tail from the previous one. |
+| `border-type`   | no       | Looked up against the palette's border types; also applied as a CSS class (`hexcrawl-border-{type}`) for custom styling.                         |
+
+A pair may name a hex just outside the grid — that's how a border caps the map's outer boundary, rather than a sign the border is invalid. A border with any pair failing validation (not neighbors, not head-to-tail, or entirely off-grid) is skipped on load, with an error logged and shown as a Notice.
+
+Only the first or last edge of a border can be removed (via right-click, in the Border tool); removing the only remaining edge deletes the whole note.
+
+## Contributing
+
+Contributions via bug reports, bug fixes, documentation, and general improvements are always welcome. For more major feature work, make an issue about the feature idea / reach out to me so we can judge feasibility and how best to implement it.
+
+### Local development
 
 ```bash
 npm install
 npm run dev            # watch build
+```
+
+### Preparing for creating pull requests
+
+If you plan on doing pull request, we would also recommend to do the following in advance of creating the pull request:
+
+```bash
 npm run build          # production build (type-checks first)
 npm test               # run unit tests
 npm run lint           # eslint
@@ -171,3 +208,10 @@ Install the [pre-commit](https://pre-commit.com/) hook once per clone so typeche
 ```bash
 pre-commit install
 ```
+
+## Inspiration & Credits
+
+- Alex Schroeder's [Text Mapper](https://src.alexschroeder.ch/text-mapper.git/) and its [port for Obsidian](https://github.com/modality/obsidian-text-mapper).
+- [The Great Antarctic Hexcrawl pt. 9](https://idraluna-archives.bearblog.dev/the-great-antarctic-hexcrawl-pt-9-cartography-naming-stuff-diversifying-regions-markdown/).
+- [Hexagonal Grids](https://www.redblobgames.com/) by Amit Patel.
+- This plugin uses the Gnomeyland icons pack by Gregory B. MacKenzie for the default terrain palette (see [Palettes](#palettes)). The Gnomeyland icons are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/).

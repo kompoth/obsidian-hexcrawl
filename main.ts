@@ -1,10 +1,10 @@
 import { Plugin } from "obsidian";
 import { parseHexcrawlParams } from "./src/params";
-import { HexMapRenderer } from "./src/HexMapRenderer";
-import { resolveNamedPalette } from "./src/pure";
-import { getDefaultSettings } from "./src/settings";
-import type { HexcrawlSettings } from "./src/settings";
-import { HexcrawlSettingTab } from "./src/SettingsTab";
+import { HexMapRenderer } from "./src/render/HexMapRenderer";
+import { resolveNamedPalette } from "./src/palette";
+import { getDefaultSettings } from "./src/settings/settings";
+import type { HexcrawlSettings } from "./src/settings/settings";
+import { HexcrawlSettingTab } from "./src/settings/SettingsTab";
 
 export default class HexcrawlPlugin extends Plugin {
 	settings: HexcrawlSettings;
@@ -28,6 +28,11 @@ export default class HexcrawlPlugin extends Plugin {
 	async loadSettings(): Promise<void> {
 		const data = (await this.loadData()) as Partial<HexcrawlSettings> | null;
 		this.settings = Object.assign({}, getDefaultSettings(), data);
+		// Settings saved before the Borders feature existed have no `borders` key on their
+		// palettes — backfill it so every other reader can assume it's always present.
+		for (const palette of Object.values(this.settings.palettes)) {
+			palette.borders ??= {};
+		}
 	}
 
 	async saveSettings(): Promise<void> {

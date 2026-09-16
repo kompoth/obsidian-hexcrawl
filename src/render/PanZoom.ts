@@ -5,7 +5,13 @@ const MAX_SCALE = 5;
 const ZOOM_STEP = 1.1;
 const DRAG_THRESHOLD = 5;
 
-/** Wires wheel-zoom and drag-to-pan onto clipEl/viewportEl; a plain (non-drag) click fires onClick. */
+/**
+ * Wires wheel-zoom and drag-to-pan onto clipEl/viewportEl; a plain (non-drag) click fires
+ * onClick. While isPaintMode() is true, a pointer-down starts painting instead of panning:
+ * onPaint fires on pointerdown and on every subsequent pointermove, letting the caller paint
+ * a continuous line of hexes instead of one hex per click; onPaintEnd fires once the stroke
+ * is released, so the caller can group it into a single undo step.
+ */
 export function setupPanAndZoom(
 	container: HTMLElement,
 	ctx: MarkdownPostProcessorContext,
@@ -13,6 +19,9 @@ export function setupPanAndZoom(
 	viewportEl: HTMLElement,
 	totalSize: { width: number; height: number },
 	onClick: (e: PointerEvent) => void,
+	isPaintMode: () => boolean,
+	onPaint: (e: PointerEvent) => void,
+	onPaintEnd: () => void,
 ): void {
 	let scale = 1;
 	let panX = 0;
@@ -69,26 +78,49 @@ export function setupPanAndZoom(
 	);
 
 	let dragging = false;
+	let painting = false;
 	let moved = false;
 	let lastX = 0;
 	let lastY = 0;
 
 	clipEl.addEventListener("pointerdown", (e: PointerEvent) => {
+		// Right/middle button: leave it alone entirely rather than preventDefault()-ing it.
+		// Chromium ties the native "contextmenu" event's firing to whether the triggering
+		// pointerdown/mousedown had its default action prevented, so calling preventDefault()
+		// here for a right-click would silently suppress every border/path segment's
+		// right-click-to-remove handler downstream.
+		if (e.button !== 0) return;
+
 		// Without this, the browser's default action on a mouse-down-and-move
 		// is to start a native text/content selection drag — which on a plain
 		// div still works and lets the user drop a copy of a hex (icon or not)
 		// elsewhere on the page. Suppressing it here leaves only our own pan.
 		e.preventDefault();
+		userInteracted = true;
+		clipEl.setPointerCapture(e.pointerId);
+		// preventDefault() above also suppresses the browser's default click-to-focus, which
+		// undo/redo's keyboard shortcut relies on (it's scoped to this element so it doesn't
+		// fight with Obsidian's own editor undo).
+		clipEl.focus();
+
+		if (isPaintMode()) {
+			painting = true;
+			onPaint(e);
+			return;
+		}
+
 		dragging = true;
 		moved = false;
-		userInteracted = true;
 		lastX = e.clientX;
 		lastY = e.clientY;
 		clipEl.addClass("hexcrawl-dragging");
-		clipEl.setPointerCapture(e.pointerId);
 	});
 
 	clipEl.addEventListener("pointermove", (e: PointerEvent) => {
+		if (painting) {
+			onPaint(e);
+			return;
+		}
 		if (!dragging) return;
 		const dx = e.clientX - lastX;
 		const dy = e.clientY - lastY;
@@ -101,6 +133,11 @@ export function setupPanAndZoom(
 	});
 
 	const endDrag = (e: PointerEvent) => {
+		if (painting) {
+			painting = false;
+			onPaintEnd();
+			return;
+		}
 		if (!dragging) return;
 		dragging = false;
 		clipEl.removeClass("hexcrawl-dragging");

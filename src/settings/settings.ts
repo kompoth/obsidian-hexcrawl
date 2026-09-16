@@ -1,4 +1,4 @@
-import type { Palette } from "./types";
+import type { Palette } from "../types";
 
 export interface HexcrawlSettings {
 	/** Named palette -> definition. Always has at least one entry. */
@@ -21,13 +21,16 @@ export function getDefaultSettings(): HexcrawlSettings {
 			mountains: { color: "#ACBC9D", icon: "mountains" }, // gray
 			desert: { color: "#E3BEA3", icon: "desert" }, // sand
 			swamp: { color: "#6F9487", icon: "swamp" }, // blue-green
-			water: { color: "#6EBAE7", icon: "lake" }, // water
+			water: { color: "#6EBAE7" }, // water
 		},
 		paths: {
 			road: { color: "#C97457", width: 5, dash: "solid" }, // dark-soil
 			river: { color: "#6EBAE7", width: 5, dash: "solid", spline: true },
 			trail: { color: "#000000", width: 3, dash: "dashed" },
-			seaway: { color: "#ffffff", width: 3, dash: "dashed", spline: true },
+			seaway: { color: "#ffffff", width: 5, dash: "dotted", spline: true },
+		},
+		borders: {
+			barrier: { color: "#f50000", width: 4, dash: "solid" },
 		},
 	};
 	return {
