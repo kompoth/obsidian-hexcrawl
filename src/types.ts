@@ -23,11 +23,23 @@ export interface PathStyleEntry {
 	spline?: boolean;
 }
 
+export interface BorderStyleEntry {
+	color?: string;
+	/** Stroke width in pixels. */
+	width?: number;
+	dash?: PathDashStyle;
+	/** Pixels the edge is shifted toward the first hex of each pair (the pivot it's defined
+	 *  from) — 0 (or undefined) means no shift. */
+	edgeOffset?: number;
+}
+
 export interface Palette {
 	/** Terrain name (matched against a note's hex-terrain value) -> entry. */
 	terrain: Record<string, TerrainPaletteEntry>;
 	/** Path type (matched against a note's path-type value) -> style. */
 	paths: Record<string, PathStyleEntry>;
+	/** Border type (matched against a note's border-type value) -> style. */
+	borders: Record<string, BorderStyleEntry>;
 	/** Vault-relative folder icon names (terrain/hex-icon) are looked up in. */
 	iconsFolder?: string;
 }
@@ -47,6 +59,8 @@ export interface HexcrawlBlockParams {
 	showCoords: boolean;
 	/** Vault-relative path to the folder containing path notes (roads, rivers, barriers, ...). */
 	pathsFolder?: string;
+	/** Vault-relative path to the folder containing border notes. */
+	bordersFolder?: string;
 	palette?: Palette;
 	/** How hex-gm-icon is rendered on its own visibility layer, above everything else. */
 	gmIconMode: GmIconMode;
@@ -77,4 +91,14 @@ export interface PathData {
 	hexes: HexCoord[];
 	/** Render as a smooth spline instead of straight segments; undefined defers to the palette's default for this type. */
 	spline?: boolean;
+}
+
+export interface BorderData {
+	/** Vault path of the note this border came from, so clicking it can open that note. */
+	notePath: string;
+	name: string;
+	/** border-type frontmatter value; looked up in palette.borders the same way path-type is. */
+	type?: string;
+	/** Head-to-tail pairs of neighboring hexes from border-hexes; each pair's shared edge is one segment. */
+	pairs: [HexCoord, HexCoord][];
 }

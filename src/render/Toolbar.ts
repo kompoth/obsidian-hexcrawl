@@ -4,7 +4,7 @@ import { resolveIcons } from "../dataLoaders";
 import { resolveIconsFolder } from "../palette";
 
 export type ToolKind =
-	"brush" | "bucket" | "icon" | "gm-icon" | "path" | "layers";
+	"brush" | "bucket" | "icon" | "gm-icon" | "path" | "border" | "layers";
 
 /** What's currently picked in the drawer: the eraser, or a named palette/icon value. */
 export type DrawerSelection = { erase: true } | { erase: false; value: string };
@@ -16,6 +16,7 @@ const TOOLS: { kind: ToolKind; icon: string; label: string }[] = [
 	{ kind: "icon", icon: "flag", label: "Icon" },
 	{ kind: "gm-icon", icon: "hat-glasses", label: "GM Icon" },
 	{ kind: "path", icon: "route", label: "Path" },
+	{ kind: "border", icon: "fence", label: "Border" },
 	{ kind: "layers", icon: "layers", label: "Layers" },
 ];
 
@@ -101,6 +102,8 @@ interface ToolbarHooks {
 	onToolChange: (kind: ToolKind | null) => void;
 	/** Delegate for populating the Path tool's own drawer content. */
 	populatePathDrawer: (scrollEl: HTMLElement) => void;
+	/** Delegate for populating the Border tool's own drawer content. */
+	populateBorderDrawer: (scrollEl: HTMLElement) => void;
 	/** Delegate for populating the Layers tool's own drawer content. */
 	populateLayersDrawer: (scrollEl: HTMLElement) => void;
 }
@@ -225,6 +228,9 @@ export class Toolbar {
 				break;
 			case "path":
 				this.hooks.populatePathDrawer(scrollEl);
+				break;
+			case "border":
+				this.hooks.populateBorderDrawer(scrollEl);
 				break;
 			case "layers":
 				this.hooks.populateLayersDrawer(scrollEl);

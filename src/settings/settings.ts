@@ -29,6 +29,9 @@ export function getDefaultSettings(): HexcrawlSettings {
 			trail: { color: "#000000", width: 3, dash: "dashed" },
 			seaway: { color: "#ffffff", width: 5, dash: "dotted", spline: true },
 		},
+		borders: {
+			barrier: { color: "#f50000", width: 4, dash: "solid" },
+		},
 	};
 	return {
 		palettes: { [DEFAULT_PALETTE_NAME]: defaultPalette },

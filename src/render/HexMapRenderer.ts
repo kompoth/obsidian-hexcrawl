@@ -19,6 +19,7 @@ import { setupPanAndZoom } from "./PanZoom";
 import { createDrawerToggleItem, Toolbar } from "./Toolbar";
 import type { DrawerSelection, ToolKind } from "./Toolbar";
 import { PathTool } from "./PathTool";
+import { BorderTool } from "./BorderTool";
 import { TerrainLayer } from "./TerrainLayer";
 import { IconsLayer } from "./IconsLayer";
 import { GmIconsLayer } from "./GmIconsLayer";
@@ -67,6 +68,7 @@ export class HexMapRenderer {
 
 	private toolbar: Toolbar;
 	private pathTool: PathTool;
+	private borderTool: BorderTool;
 	private terrainLayer: TerrainLayer;
 	private iconsLayer: IconsLayer;
 	private gmIconsLayer: GmIconsLayer;
@@ -79,11 +81,22 @@ export class HexMapRenderer {
 		private ctx: MarkdownPostProcessorContext,
 	) {
 		this.toolbar = new Toolbar(app, params, {
-			onToolChange: () => this.pathTool.reset(),
+			onToolChange: () => {
+				this.pathTool.reset();
+				this.borderTool.reset();
+			},
 			populatePathDrawer: (scrollEl) => this.pathTool.populateDrawer(scrollEl),
+			populateBorderDrawer: (scrollEl) =>
+				this.borderTool.populateDrawer(scrollEl),
 			populateLayersDrawer: (scrollEl) => this.populateLayersDrawer(scrollEl),
 		});
 		this.pathTool = new PathTool(
+			app,
+			params,
+			() => this.toolbar.refreshDrawer(),
+			this.undoManager,
+		);
+		this.borderTool = new BorderTool(
 			app,
 			params,
 			() => this.toolbar.refreshDrawer(),
@@ -123,12 +136,19 @@ export class HexMapRenderer {
 			height,
 			showCoords,
 			pathsFolder,
+			bordersFolder,
 		} = this.params;
 		const pathsFolderObj = pathsFolder
 			? this.app.vault.getAbstractFileByPath(normalizePath(pathsFolder))
 			: undefined;
 		this.pathTool.load(
 			pathsFolderObj instanceof TFolder ? pathsFolderObj : null,
+		);
+		const bordersFolderObj = bordersFolder
+			? this.app.vault.getAbstractFileByPath(normalizePath(bordersFolder))
+			: undefined;
+		this.borderTool.load(
+			bordersFolderObj instanceof TFolder ? bordersFolderObj : null,
 		);
 
 		const clipEl = this.container.createDiv({
@@ -149,11 +169,13 @@ export class HexMapRenderer {
 		viewportEl.style.width = `${totalSize.width}px`;
 		viewportEl.style.height = `${totalSize.height}px`;
 
-		// Stacking order, bottom to top: terrain colors, then paths, then icons, then GM
-		// icons — each renders after the last (and so on top of it) so nothing crossing a
-		// hex ever paints over what's above it. GM icons are topmost, above everything.
+		// Stacking order, bottom to top: terrain colors, then borders, then paths, then icons,
+		// then GM icons — each renders after the last (and so on top of it) so nothing crossing
+		// a hex ever paints over what's above it. GM icons are topmost, above everything.
 		this.terrainLayer.mount(viewportEl);
 		this.terrainLayer.render(this.hexNotes, gutter);
+
+		this.borderTool.mount(viewportEl, gutter, totalSize);
 
 		this.pathTool.mount(viewportEl, gutter, totalSize);
 
@@ -166,6 +188,10 @@ export class HexMapRenderer {
 		void this.gmIconsLayer.load().then(() => {
 			this.gmIconsLayer.render(this.hexNotes, gutter);
 		});
+
+		// Mounted last so its editing-only affordances (add-edge dots, end-removal hitareas)
+		// always paint on top of paths/icons, regardless of where on the grid they fall.
+		this.borderTool.mountOverlay(viewportEl, totalSize);
 
 		if (showCoords)
 			this.renderAxisLabels(
@@ -246,11 +272,18 @@ export class HexMapRenderer {
 	private populateLayersDrawer(scrollEl: HTMLElement): void {
 		const layers = [
 			this.terrainLayer,
+			this.borderTool,
 			this.pathTool,
 			this.iconsLayer,
 			this.gmIconsLayer,
 		] as const;
-		const labels = ["Terrain", "Paths", "Icons", "GM Icons"] as const;
+		const labels = [
+			"Terrain",
+			"Borders",
+			"Paths",
+			"Icons",
+			"GM Icons",
+		] as const;
 		layers.forEach((layer, i) => {
 			createDrawerToggleItem(
 				scrollEl,
@@ -277,6 +310,11 @@ export class HexMapRenderer {
 
 		if (activeTool === "path") {
 			this.pathTool.handleClick(hit);
+			return;
+		}
+
+		if (activeTool === "border") {
+			this.borderTool.handleClick(hit, { x: e.clientX, y: e.clientY });
 			return;
 		}
 
@@ -350,7 +388,7 @@ export class HexMapRenderer {
 	private async runTool(
 		q: number,
 		r: number,
-		activeTool: Exclude<ToolKind, "path">,
+		activeTool: Exclude<ToolKind, "path" | "border">,
 		selection: DrawerSelection | null,
 	): Promise<void> {
 		if (!selection) return;

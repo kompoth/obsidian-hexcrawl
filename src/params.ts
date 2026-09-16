@@ -99,6 +99,11 @@ export function parseHexcrawlParams(
 			? params.paths.trim()
 			: undefined;
 
+	const bordersFolder =
+		typeof params.borders === "string" && params.borders.trim()
+			? params.borders.trim()
+			: undefined;
+
 	const paletteResult = parsePalette(params.palette, resolveNamedPalette);
 	if (!paletteResult.ok) return paletteResult;
 
@@ -127,6 +132,7 @@ export function parseHexcrawlParams(
 			showCoords,
 			palette: paletteResult.value,
 			pathsFolder,
+			bordersFolder,
 			gmIconMode,
 		},
 	};
@@ -249,8 +255,69 @@ function parsePalette(
 		}
 	}
 
+	const borders: Palette["borders"] = {};
+	if (paletteRaw.borders !== undefined) {
+		if (typeof paletteRaw.borders !== "object" || paletteRaw.borders === null) {
+			return {
+				ok: false,
+				error:
+					"palette.borders must be a mapping of border type to {color, width, dash, edgeOffset}.",
+			};
+		}
+		for (const [name, entryRaw] of Object.entries(
+			paletteRaw.borders as Record<string, unknown>,
+		)) {
+			if (typeof entryRaw !== "object" || entryRaw === null) {
+				return {
+					ok: false,
+					error: `palette.borders.${name} must be a mapping with color/width/dash/edgeOffset.`,
+				};
+			}
+			const entry = entryRaw as Record<string, unknown>;
+			const color =
+				typeof entry.color === "string" && entry.color.trim()
+					? entry.color.trim()
+					: undefined;
+
+			const width = entry.width !== undefined ? Number(entry.width) : undefined;
+			if (width !== undefined && (!Number.isFinite(width) || width <= 0)) {
+				return {
+					ok: false,
+					error: `palette.borders.${name}.width must be a positive number.`,
+				};
+			}
+
+			let dash: PathDashStyle | undefined;
+			if (entry.dash !== undefined) {
+				const dashRaw =
+					typeof entry.dash === "string" ? entry.dash.toLowerCase() : "";
+				if (!DASH_STYLES.includes(dashRaw as PathDashStyle)) {
+					return {
+						ok: false,
+						error: `palette.borders.${name}.dash must be one of: ${DASH_STYLES.join(", ")}.`,
+					};
+				}
+				dash = dashRaw as PathDashStyle;
+			}
+
+			const edgeOffset =
+				entry.edgeOffset !== undefined ? Number(entry.edgeOffset) : undefined;
+			if (
+				edgeOffset !== undefined &&
+				(!Number.isFinite(edgeOffset) || edgeOffset < 0)
+			) {
+				return {
+					ok: false,
+					error: `palette.borders.${name}.edgeOffset must be a non-negative number.`,
+				};
+			}
+
+			borders[name] = { color, width, dash, edgeOffset };
+		}
+	}
+
 	return {
 		ok: true,
-		value: { terrain, paths, iconsFolder: paletteIconsFolder },
+		value: { terrain, paths, borders, iconsFolder: paletteIconsFolder },
 	};
 }

@@ -11,6 +11,7 @@ describe("resolvePaletteEntry", () => {
 	const palette: Palette = {
 		terrain: { forest: { color: "green", icon: "tree" } },
 		paths: {},
+		borders: {},
 	};
 	const note = (terrain?: string): HexNoteData => ({
 		path: "p",
@@ -40,8 +41,8 @@ describe("resolvePaletteEntry", () => {
 });
 
 describe("resolveNamedPalette", () => {
-	const a: Palette = { terrain: { a: {} }, paths: {} };
-	const b: Palette = { terrain: { b: {} }, paths: {} };
+	const a: Palette = { terrain: { a: {} }, paths: {}, borders: {} };
+	const b: Palette = { terrain: { b: {} }, paths: {}, borders: {} };
 	const settings = { palettes: { A: a, B: b }, defaultPalette: "A" };
 
 	it("looks up a named palette", () => {
@@ -87,7 +88,12 @@ describe("resolveIconsFolder", () => {
 	it("returns the palette's own icons folder", () => {
 		expect(
 			resolveIconsFolder({
-				palette: { terrain: {}, paths: {}, iconsFolder: "Palette/Icons" },
+				palette: {
+					terrain: {},
+					paths: {},
+					borders: {},
+					iconsFolder: "Palette/Icons",
+				},
 			}),
 		).toBe("Palette/Icons");
 	});
@@ -95,7 +101,7 @@ describe("resolveIconsFolder", () => {
 	it("returns undefined when neither is set", () => {
 		expect(resolveIconsFolder({})).toBeUndefined();
 		expect(
-			resolveIconsFolder({ palette: { terrain: {}, paths: {} } }),
+			resolveIconsFolder({ palette: { terrain: {}, paths: {}, borders: {} } }),
 		).toBeUndefined();
 	});
 });

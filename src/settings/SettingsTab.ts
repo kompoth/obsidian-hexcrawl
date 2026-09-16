@@ -43,7 +43,11 @@ export class HexcrawlSettingTab extends PluginSettingTab {
 
 	private addPalette(): void {
 		const name = uniqueKey(this.plugin.settings.palettes, "New palette");
-		this.plugin.settings.palettes[name] = { terrain: {}, paths: {} };
+		this.plugin.settings.palettes[name] = {
+			terrain: {},
+			paths: {},
+			borders: {},
+		};
 		void this.plugin.saveSettings();
 		this.openEditor(name);
 	}

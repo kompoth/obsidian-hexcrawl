@@ -28,6 +28,11 @@ export default class HexcrawlPlugin extends Plugin {
 	async loadSettings(): Promise<void> {
 		const data = (await this.loadData()) as Partial<HexcrawlSettings> | null;
 		this.settings = Object.assign({}, getDefaultSettings(), data);
+		// Settings saved before the Borders feature existed have no `borders` key on their
+		// palettes — backfill it so every other reader can assume it's always present.
+		for (const palette of Object.values(this.settings.palettes)) {
+			palette.borders ??= {};
+		}
 	}
 
 	async saveSettings(): Promise<void> {

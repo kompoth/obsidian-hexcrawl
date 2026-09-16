@@ -66,6 +66,38 @@ export function hexCenter(
 	return { cx, cy };
 }
 
+/**
+ * The 6 pixel vertices of a hex centered at (cx, cy), in clockwise screen order — matches the
+ * `.hexcrawl-hex-pointy`/`-flat` clip-path polygons in styles.css (pointy starts at the top
+ * point, flat at the upper-left point). Orientation-only; independent of stagger.
+ */
+export function hexVertices(
+	cx: number,
+	cy: number,
+	orientation: HexOrientation,
+	hexRadius: number,
+): Pt[] {
+	const R = hexRadius;
+	if (orientation === "pointy") {
+		return [
+			{ cx, cy: cy - R },
+			{ cx: cx + (SQRT3 * R) / 2, cy: cy - R / 2 },
+			{ cx: cx + (SQRT3 * R) / 2, cy: cy + R / 2 },
+			{ cx, cy: cy + R },
+			{ cx: cx - (SQRT3 * R) / 2, cy: cy + R / 2 },
+			{ cx: cx - (SQRT3 * R) / 2, cy: cy - R / 2 },
+		];
+	}
+	return [
+		{ cx: cx - R / 2, cy: cy - (SQRT3 * R) / 2 },
+		{ cx: cx + R / 2, cy: cy - (SQRT3 * R) / 2 },
+		{ cx: cx + R, cy },
+		{ cx: cx + R / 2, cy: cy + (SQRT3 * R) / 2 },
+		{ cx: cx - R / 2, cy: cy + (SQRT3 * R) / 2 },
+		{ cx: cx - R, cy },
+	];
+}
+
 /** Pixel bounding box for a full grid of hexes, for sizing the viewport. */
 export function gridBoundingBox(
 	cols: number,

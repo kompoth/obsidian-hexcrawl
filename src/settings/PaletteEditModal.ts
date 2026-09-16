@@ -4,6 +4,7 @@ import { resolveIcons } from "../dataLoaders";
 import { applyPathPreviewStyle, DEFAULT_PATH_WIDTH } from "../render/pathStyle";
 import { renameKey, uniqueKey } from "../naming";
 import type {
+	BorderStyleEntry,
 	Palette,
 	PathDashStyle,
 	PathStyleEntry,
@@ -122,6 +123,20 @@ export class PaletteEditModal extends Modal {
 			}),
 		);
 
+		contentEl.createEl("h3", { text: "Borders" });
+		const borderListEl = contentEl.createDiv();
+		this.renderBorderList(borderListEl);
+		new Setting(contentEl).addButton((btn) =>
+			btn.setButtonText("Add border type").onClick(() => {
+				const key = uniqueKey(palette.borders, "New border");
+				palette.borders[key] = {};
+				void this.plugin.saveSettings();
+				new BorderEntryModal(this.app, this.plugin, this.name, key, () =>
+					this.renderBorderList(borderListEl),
+				).open();
+			}),
+		);
+
 		new Setting(contentEl).addButton((btn) =>
 			btn
 				.setButtonText("Done")
@@ -205,6 +220,40 @@ export class PaletteEditModal extends Modal {
 						delete palette.paths[key];
 						void this.plugin.saveSettings();
 						this.renderPathList(el);
+					}),
+			);
+		}
+	}
+
+	private renderBorderList(el: HTMLElement): void {
+		el.empty();
+		const palette = this.palette;
+
+		for (const key of Object.keys(palette.borders)) {
+			const entry = palette.borders[key];
+			const row = new Setting(el).setName(key);
+			const previewEl = row.controlEl.createDiv({
+				cls: "hexcrawl-settings-path-preview",
+			});
+			applyPathPreviewStyle(previewEl, entry);
+			row.addExtraButton((btn) =>
+				btn
+					.setIcon("pencil")
+					.setTooltip("Edit")
+					.onClick(() => {
+						new BorderEntryModal(this.app, this.plugin, this.name, key, () =>
+							this.renderBorderList(el),
+						).open();
+					}),
+			);
+			row.addExtraButton((btn) =>
+				btn
+					.setIcon("trash-2")
+					.setTooltip("Remove")
+					.onClick(() => {
+						delete palette.borders[key];
+						void this.plugin.saveSettings();
+						this.renderBorderList(el);
 					}),
 			);
 		}
@@ -424,5 +473,94 @@ class PathEntryModal extends PaletteEntryModal<PathStyleEntry> {
 			);
 
 		this.addDeleteDoneButtons(contentEl, () => delete palette.paths[this.key]);
+	}
+}
+
+/** Edits one border type's name/color/width/dash/edge-offset, with a live line preview. */
+class BorderEntryModal extends PaletteEntryModal<BorderStyleEntry> {
+	protected noun = "border type";
+
+	protected entries(palette: Palette): Record<string, BorderStyleEntry> {
+		return palette.borders;
+	}
+
+	protected renderFields(): void {
+		this.setTitle("Edit border type");
+		const { contentEl } = this;
+		contentEl.empty();
+		const palette = this.palette;
+		const entry = palette.borders[this.key];
+
+		const previewEl = contentEl.createDiv({
+			cls: "hexcrawl-settings-path-preview",
+		});
+		const updatePreview = () => applyPathPreviewStyle(previewEl, entry);
+		updatePreview();
+
+		new Setting(contentEl)
+			.setName("Name")
+			.addText((text) =>
+				text.setValue(this.key).onChange((v) => (this.pendingKey = v)),
+			);
+
+		new Setting(contentEl).setName("Color").addColorPicker((color) =>
+			color.setValue(entry.color ?? "#888888").onChange((v) => {
+				entry.color = v;
+				updatePreview();
+				void this.plugin.saveSettings();
+			}),
+		);
+
+		new Setting(contentEl).setName("Width").addText((text) =>
+			text
+				.setPlaceholder(String(DEFAULT_PATH_WIDTH))
+				.setValue(entry.width !== undefined ? String(entry.width) : "")
+				.onChange((v) => {
+					const width = v.trim() ? Number(v) : undefined;
+					if (width !== undefined && (!Number.isFinite(width) || width <= 0))
+						return;
+					entry.width = width;
+					updatePreview();
+					void this.plugin.saveSettings();
+				}),
+		);
+
+		new Setting(contentEl).setName("Dash").addDropdown((dropdown) => {
+			dropdown.addOption("", "default");
+			for (const opt of DASH_OPTIONS) dropdown.addOption(opt, opt);
+			dropdown.setValue(entry.dash ?? "").onChange((v) => {
+				entry.dash = DASH_OPTIONS.find((opt) => opt === v);
+				updatePreview();
+				void this.plugin.saveSettings();
+			});
+		});
+
+		new Setting(contentEl)
+			.setName("Edge offset")
+			.setDesc(
+				"Pixels the edge is shifted toward the first hex of each pair (the hex the border edge was drawn from).",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("0")
+					.setValue(
+						entry.edgeOffset !== undefined ? String(entry.edgeOffset) : "",
+					)
+					.onChange((v) => {
+						const edgeOffset = v.trim() ? Number(v) : undefined;
+						if (
+							edgeOffset !== undefined &&
+							(!Number.isFinite(edgeOffset) || edgeOffset < 0)
+						)
+							return;
+						entry.edgeOffset = edgeOffset;
+						void this.plugin.saveSettings();
+					}),
+			);
+
+		this.addDeleteDoneButtons(
+			contentEl,
+			() => delete palette.borders[this.key],
+		);
 	}
 }
