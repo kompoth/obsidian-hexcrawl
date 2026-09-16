@@ -44,14 +44,15 @@ hex-terrain: forest
 
 A toolbar pinned to the top-right corner of every rendered map lets you edit it directly, with no frontmatter to hand-write:
 
-| Tool    | What it does                                                                                                    |
-| ------- | --------------------------------------------------------------------------------------------------------------- |
-| Brush   | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it.                                      |
-| Bucket  | Flood-fill connected same-terrain hexes with a new one.                                                         |
-| Icon    | Drop an icon from the palette's icon folder onto a hex, or erase it.                                            |
-| GM Icon | Same as Icon, but for `hex-gm-icon` — its own layer, always rendered above everything else.                     |
-| Path    | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points. |
-| Layers  | Toggle terrain, icons, GM icons, and paths on or off independently.                                             |
+| Tool    | What it does                                                                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Brush   | Paint a terrain onto hexes one click at a time; pick "Eraser" to clear it.                                                                                                                  |
+| Bucket  | Flood-fill connected same-terrain hexes with a new one.                                                                                                                                     |
+| Icon    | Drop an icon from the palette's icon folder onto a hex, or erase it.                                                                                                                        |
+| GM Icon | Same as Icon, but for `hex-gm-icon` — its own layer, always rendered above everything else.                                                                                                 |
+| Path    | Draw a new road/river by clicking hexes in order, or click an existing path to move, add, or remove its points.                                                                             |
+| Border  | Draw a new border/barrier by clicking near a shared hex edge to start it, or click an existing border to extend either end (via the add-edge dots) or right-click an end edge to remove it. |
+| Layers  | Toggle terrain, borders, paths, icons, and GM icons on or off independently.                                                                                                                |
 
 Every change is written straight to the affected note's frontmatter (or creates a new path note), so the map and the notes never drift apart.
 
@@ -69,11 +70,12 @@ Every change is written straight to the affected note's frontmatter (or creates 
 | `coords`      | no       | `false`                | Show q/r coordinate labels along the top and left axes.                                                                |
 | `palette`     | no       | default global palette | Name of a global palette (e.g. `palette: Wikipedia`), or an inline mapping for a one-off palette scoped to this block. |
 | `paths`       | no       | —                      | Vault-relative path to a folder of path notes (roads, rivers, ...).                                                    |
+| `borders`     | no       | —                      | Vault-relative path to a folder of border notes (barriers, walls, ...).                                                |
 | `gmIconMode`  | no       | `default`              | How `hex-gm-icon` is rendered: `default` (hex center, like a regular icon) or `mini` (half-size, top-left of the hex). |
 
 ### Palettes
 
-Manage named palettes vault-wide from Settings → Hexcrawl. Add, duplicate, delete, mark a default, and edit each one's terrain/path entries and icons folder (with a picker and live preview). Leave a palette's icons folder empty to use the plugin's bundled icon pack; set one to use only icons from that vault folder instead — the two are never combined.
+Manage named palettes vault-wide from Settings → Hexcrawl. Add, duplicate, delete, mark a default, and edit each one's terrain/path/border entries and icons folder (with a picker and live preview). Leave a palette's icons folder empty to use the plugin's bundled icon pack; set one to use only icons from that vault folder instead — the two are never combined.
 
 A `hexcrawl` block picks one with `palette: <name>`, or omits it to use the default.
 
@@ -96,6 +98,11 @@ palette:
       color: "#4A90C2"
       width: 4
       spline: true
+  borders:
+    barrier:
+      color: "#f50000"
+      width: 4
+      dash: solid
 ```
 
 | Terrain key | Required | Description                                                                                                          |
@@ -110,7 +117,14 @@ palette:
 | `dash`   | no       | `solid`             | `solid`, `dashed`, or `dotted`.                                 |
 | `spline` | no       | `false`             | Smooth curve vs. straight segments, unless a note overrides it. |
 
-`hex-icon` on a note always wins over the palette's icon. A `hex-terrain` or `path-type` with no palette match falls back to being used directly as a CSS color.
+| Border key   | Required | Default             | Description                                                                                    |
+| ------------ | -------- | ------------------- | ---------------------------------------------------------------------------------------------- |
+| `color`      | no       | `var(--text-muted)` | Stroke color.                                                                                  |
+| `width`      | no       | `3`                 | Stroke width in pixels.                                                                        |
+| `dash`       | no       | `solid`             | `solid`, `dashed`, or `dotted`.                                                                |
+| `edgeOffset` | no       | `0`                 | Pixels the edge is shifted toward the first hex of each pair — for building two-sided borders. |
+
+`hex-icon` on a note always wins over the palette's icon. A `hex-terrain`, `path-type`, or `border-type` with no palette match falls back to being used directly as a CSS color.
 
 ### Hex note frontmatter
 
@@ -144,6 +158,28 @@ path-spline: true
 | `path-hexes`    | yes      | Ordered list of `[q, r]` pairs (at least 2). The path is drawn through each hex's center, in order.                  |
 | `path-type`     | no       | Looked up against the palette's path types; also applied as a CSS class (`hexcrawl-path-{type}`) for custom styling. |
 | `path-spline`   | no       | Overrides the type's default curve/straight rendering for this path.                                                 |
+
+### Borders (barriers, walls, etc)
+
+Unlike a path, a border isn't drawn through hex centers — it runs along the shared **edges** between neighboring hexes, which is why `border-hexes` is a list of hex pairs rather than a flat list: each pair names the two hexes on either side of one edge. Consecutive pairs must share exactly one hex, head-to-tail, with the previous pair — this is also what lets a border turn a corner around a single hex, pivoting on it for two edges in a row. Each note is its own border, in the block's `borders` folder, with its title doubling as its name:
+
+```yaml
+---
+border-type: barrier
+border-hexes:
+  - [[0, 0], [1, 1]]
+  - [[1, 1], [0, 1]]
+---
+```
+
+| Frontmatter key | Required | Description                                                                                                                                      |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `border-hexes`  | yes      | Ordered list of hex pairs (at least 1). Each pair's two hexes must be neighbors, and each pair must continue head-to-tail from the previous one. |
+| `border-type`   | no       | Looked up against the palette's border types; also applied as a CSS class (`hexcrawl-border-{type}`) for custom styling.                         |
+
+A pair may name a hex just outside the grid — that's how a border caps the map's outer boundary, rather than a sign the border is invalid. A border with any pair failing validation (not neighbors, not head-to-tail, or entirely off-grid) is skipped on load, with an error logged and shown as a Notice.
+
+Only the first or last edge of a border can be removed (via right-click, in the Border tool); removing the only remaining edge deletes the whole note.
 
 ## Contributing
 
