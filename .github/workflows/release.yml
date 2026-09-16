@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v5
         with:
@@ -32,10 +34,15 @@ jobs:
             exit 1
           fi
 
+      - name: Generate release notes
+        run: node scripts/generate-release-notes.mjs "${{ github.ref_name }}" release-notes.md
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          draft: true
           files: |
             main.js
             manifest.json
