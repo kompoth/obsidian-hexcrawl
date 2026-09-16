@@ -84,6 +84,13 @@ export function setupPanAndZoom(
 	let lastY = 0;
 
 	clipEl.addEventListener("pointerdown", (e: PointerEvent) => {
+		// Right/middle button: leave it alone entirely rather than preventDefault()-ing it.
+		// Chromium ties the native "contextmenu" event's firing to whether the triggering
+		// pointerdown/mousedown had its default action prevented, so calling preventDefault()
+		// here for a right-click would silently suppress every border/path segment's
+		// right-click-to-remove handler downstream.
+		if (e.button !== 0) return;
+
 		// Without this, the browser's default action on a mouse-down-and-move
 		// is to start a native text/content selection drag — which on a plain
 		// div still works and lets the user drop a copy of a hex (icon or not)
