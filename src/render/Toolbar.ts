@@ -143,8 +143,16 @@ export class Toolbar {
 		const drawerEl = clipEl.createDiv({ cls: "hexcrawl-drawer" });
 		drawerEl.hidden = true;
 		drawerEl.addEventListener("pointerdown", (e) => e.stopPropagation());
-		drawerEl.addEventListener("wheel", (e) => e.stopPropagation());
 		const scrollEl = drawerEl.createDiv({ cls: "hexcrawl-drawer-scroll" });
+		drawerEl.addEventListener("wheel", (e: WheelEvent) => {
+			e.stopPropagation();
+			// The drawer only ever scrolls horizontally (overflow-x: auto, overflow-y:
+			// hidden), which an ordinary mouse wheel's vertical delta doesn't drive on its
+			// own — only Shift+wheel or a trackpad's native horizontal gesture would. Redirect
+			// the vertical delta into horizontal scroll so a plain wheel works too.
+			e.preventDefault();
+			scrollEl.scrollLeft += e.deltaY || e.deltaX;
+		});
 		this.scrollEl = scrollEl;
 		this.drawerEl = drawerEl;
 		this.clipEl = clipEl;
