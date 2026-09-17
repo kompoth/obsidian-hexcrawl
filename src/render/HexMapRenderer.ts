@@ -53,6 +53,14 @@ const FIELD_ACCESSORS: Record<
 	"hex-gm-icon": (note) => note.gmIcon,
 };
 
+/** Narrows away DrawerSelection's Move variant — brush/bucket never offer it, but the type is
+ *  shared across every tool's drawer. */
+function isPaintSelection(
+	selection: DrawerSelection,
+): selection is { erase: true } | { erase: false; value: string } {
+	return !("move" in selection);
+}
+
 export class HexMapRenderer {
 	private folder: TFolder | null = null;
 	private hexNotes = new Map<string, HexNoteData>();
@@ -85,6 +93,15 @@ export class HexMapRenderer {
 				this.pathTool.reset();
 				this.borderTool.reset();
 			},
+			onDrawerSelectionChange: (selection) => {
+				const moveActive = !!selection && "move" in selection;
+				this.iconsLayer.setDragEnabled(
+					moveActive && this.toolbar.activeTool === "icon",
+				);
+				this.gmIconsLayer.setDragEnabled(
+					moveActive && this.toolbar.activeTool === "gm-icon",
+				);
+			},
 			populatePathDrawer: (scrollEl) => this.pathTool.populateDrawer(scrollEl),
 			populateBorderDrawer: (scrollEl) =>
 				this.borderTool.populateDrawer(scrollEl),
@@ -103,8 +120,18 @@ export class HexMapRenderer {
 			this.undoManager,
 		);
 		this.terrainLayer = new TerrainLayer(params);
-		this.iconsLayer = new IconsLayer(app, params);
-		this.gmIconsLayer = new GmIconsLayer(app, params);
+		this.iconsLayer = new IconsLayer(
+			app,
+			params,
+			(fromQ, fromR, toQ, toR) =>
+				void this.moveIconField("hex-icon", fromQ, fromR, toQ, toR),
+		);
+		this.gmIconsLayer = new GmIconsLayer(
+			app,
+			params,
+			(fromQ, fromR, toQ, toR) =>
+				void this.moveIconField("hex-gm-icon", fromQ, fromR, toQ, toR),
+		);
 	}
 
 	render(): void {
@@ -363,7 +390,7 @@ export class HexMapRenderer {
 		this.lastPaintedKey = key;
 
 		const selection = this.toolbar.drawerSelection;
-		if (!selection) return;
+		if (!selection || !isPaintSelection(selection)) return;
 		this.strokeMutationPromises.push(
 			this.writeHexField(
 				q,
@@ -395,6 +422,7 @@ export class HexMapRenderer {
 
 		switch (activeTool) {
 			case "brush": {
+				if (!isPaintSelection(selection)) break;
 				const m = await this.writeHexField(
 					q,
 					r,
@@ -405,6 +433,7 @@ export class HexMapRenderer {
 				break;
 			}
 			case "icon": {
+				if (!isPaintSelection(selection)) break; // moving is done by dragging the icon itself
 				const m = await this.writeHexField(
 					q,
 					r,
@@ -415,6 +444,7 @@ export class HexMapRenderer {
 				break;
 			}
 			case "gm-icon": {
+				if (!isPaintSelection(selection)) break; // moving is done by dragging the icon itself
 				const m = await this.writeHexField(
 					q,
 					r,
@@ -425,6 +455,7 @@ export class HexMapRenderer {
 				break;
 			}
 			case "bucket":
+				if (!isPaintSelection(selection)) break;
 				if (!selection.erase) await this.bucketFill(q, r, selection.value);
 				break;
 			case "layers":
@@ -493,6 +524,38 @@ export class HexMapRenderer {
 			newValue: value,
 			noteExistedBefore: !!existing,
 		};
+	}
+
+	/**
+	 * Moves an icon/gm-icon field's explicit value from one hex to another — clearing it at the
+	 * source and setting it at the target — as a single undo step. No-op if the source hex has
+	 * no explicit value for `field` (only reachable via a bug in the drag gesture, since the
+	 * layers only make an icon draggable once it has one) or if source and target are the same.
+	 */
+	private async moveIconField(
+		field: "hex-icon" | "hex-gm-icon",
+		fromQ: number,
+		fromR: number,
+		toQ: number,
+		toR: number,
+	): Promise<void> {
+		if (fromQ === toQ && fromR === toR) return;
+		const fromNote = this.hexNotes.get(hexKey(fromQ, fromR));
+		const value = fromNote && FIELD_ACCESSORS[field](fromNote);
+		if (value === undefined) return;
+
+		const clearMutation = await this.writeHexField(
+			fromQ,
+			fromR,
+			field,
+			undefined,
+		);
+		const setMutation = await this.writeHexField(toQ, toR, field, value);
+		const mutations = [clearMutation, setMutation].filter(
+			(m): m is FieldMutation => m !== null,
+		);
+		if (mutations.length > 0)
+			this.undoManager.push(this.makeFieldAction(mutations));
 	}
 
 	/**
