@@ -237,7 +237,9 @@ export class HexMapRenderer {
 			viewportEl,
 			totalSize,
 			(e) => this.handleClick(e),
-			() => this.toolbar.activeTool === "brush",
+			() =>
+				this.toolbar.activeTool === "brush" &&
+				this.toolbar.drawerSelection !== null,
 			(e) => this.paintAt(e),
 			() => void this.endPaintStroke(),
 		);
