@@ -6,8 +6,10 @@ import { resolveIconsFolder } from "../palette";
 export type ToolKind =
 	"brush" | "bucket" | "icon" | "gm-icon" | "path" | "border" | "layers";
 
-/** What's currently picked in the drawer: the eraser, or a named palette/icon value. */
-export type DrawerSelection = { erase: true } | { erase: false; value: string };
+/** What's currently picked in the drawer: the eraser, a named palette/icon value, or (Icon/GM
+ *  Icon tools only) Move — while selected, icons become draggable to another hex. */
+export type DrawerSelection =
+	{ erase: true } | { erase: false; value: string } | { move: true };
 
 /** Toolbar tools, top to bottom. */
 const TOOLS: { kind: ToolKind; icon: string; label: string }[] = [
@@ -100,6 +102,9 @@ export function createDrawerToggleItem(
 interface ToolbarHooks {
 	/** Called right after the active tool changes (including to null), before the new drawer is populated. */
 	onToolChange: (kind: ToolKind | null) => void;
+	/** Called right after the drawer selection changes (including to null, e.g. on tool switch
+	 *  or Exit) — lets the Icon/GM Icon layers know when Move is (de)selected. */
+	onDrawerSelectionChange: (selection: DrawerSelection | null) => void;
 	/** Delegate for populating the Path tool's own drawer content. */
 	populatePathDrawer: (scrollEl: HTMLElement) => void;
 	/** Delegate for populating the Border tool's own drawer content. */
@@ -132,6 +137,11 @@ export class Toolbar {
 
 	get drawerSelection(): DrawerSelection | null {
 		return this._drawerSelection;
+	}
+
+	private setDrawerSelection(selection: DrawerSelection | null): void {
+		this._drawerSelection = selection;
+		this.hooks.onDrawerSelectionChange(selection);
 	}
 
 	mount(clipEl: HTMLElement): void {
@@ -184,7 +194,7 @@ export class Toolbar {
 				btn.setAttr("aria-pressed", "true");
 				drawerEl.hidden = false;
 				this._activeTool = tool.kind;
-				this._drawerSelection = null;
+				this.setDrawerSelection(null);
 				this.hooks.onToolChange(this._activeTool);
 				this.populateDrawer(scrollEl, tool.kind);
 			});
@@ -201,7 +211,7 @@ export class Toolbar {
 		}
 		if (this.drawerEl) this.drawerEl.hidden = true;
 		this._activeTool = null;
-		this._drawerSelection = null;
+		this.setDrawerSelection(null);
 		this.hooks.onToolChange(null);
 		// Hiding the drawer blurs a focused item inside it (e.g. this "Exit" click itself)
 		// out to <body> — reclaim focus so the map's undo/redo shortcut keeps working.
@@ -225,6 +235,7 @@ export class Toolbar {
 		this.addExitItem(scrollEl);
 		if (kind === "brush" || kind === "icon" || kind === "gm-icon")
 			this.addEraserItem(scrollEl);
+		if (kind === "icon" || kind === "gm-icon") this.addMoveItem(scrollEl);
 		switch (kind) {
 			case "brush":
 			case "bucket":
@@ -257,9 +268,18 @@ export class Toolbar {
 
 	private addEraserItem(scrollEl: HTMLElement): void {
 		const { previewEl } = createDrawerItem(scrollEl, "Eraser", () => {
-			this._drawerSelection = { erase: true };
+			this.setDrawerSelection({ erase: true });
 		});
 		setIcon(previewEl, "eraser");
+	}
+
+	/** Icon/GM Icon tools only: enters move mode — while selected, icons can be dragged to
+	 *  another hex. */
+	private addMoveItem(scrollEl: HTMLElement): void {
+		const { previewEl } = createDrawerItem(scrollEl, "Move", () => {
+			this.setDrawerSelection({ move: true });
+		});
+		setIcon(previewEl, "move");
 	}
 
 	private async populateTerrainDrawer(
@@ -278,7 +298,7 @@ export class Toolbar {
 		for (const name of names) {
 			const entry = terrain[name];
 			const { previewEl } = createDrawerItem(scrollEl, name, () => {
-				this._drawerSelection = { erase: false, value: name };
+				this.setDrawerSelection({ erase: false, value: name });
 			});
 			if (entry.color) previewEl.style.backgroundColor = entry.color;
 			if (entry.icon) {
@@ -302,7 +322,7 @@ export class Toolbar {
 		}
 		for (const [name, src] of sortedIcons) {
 			const { previewEl } = createDrawerItem(scrollEl, name, () => {
-				this._drawerSelection = { erase: false, value: name };
+				this.setDrawerSelection({ erase: false, value: name });
 			});
 			addDrawerPreviewImage(previewEl, src, name);
 		}

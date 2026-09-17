@@ -103,7 +103,7 @@ export class BorderLayer {
 			const style = border.type ? palette?.borders[border.type] : undefined;
 			const width = style?.width ?? DEFAULT_PATH_WIDTH;
 			const isEditing =
-				state.mode === "editing" && state.border.notePath === border.notePath;
+				state.mode === "editing" && state.border.file.path === border.file.path;
 
 			// Mitered as a whole chain, not edge-by-edge — offsetting each edge independently
 			// would leave a gap/overlap at internal joints since neighboring edges shift along
@@ -127,7 +127,7 @@ export class BorderLayer {
 					cls: border.type
 						? ["hexcrawl-border", `hexcrawl-border-${border.type}`]
 						: "hexcrawl-border",
-					attr: { d, fill: "none", "data-note-path": border.notePath },
+					attr: { d, fill: "none", "data-note-path": border.file.path },
 				});
 				const color = style?.color ?? border.type;
 				if (color) segEl.style.stroke = color;
@@ -140,7 +140,7 @@ export class BorderLayer {
 				// Wider, invisible sibling so a thin/dashed line is still easy to click/select.
 				const hitEl = svg.createSvg("path", {
 					cls: "hexcrawl-border-hitarea",
-					attr: { d, fill: "none", "data-note-path": border.notePath },
+					attr: { d, fill: "none", "data-note-path": border.file.path },
 				});
 				hitEl.style.strokeWidth = String(Math.max(width, MIN_HITAREA_WIDTH));
 

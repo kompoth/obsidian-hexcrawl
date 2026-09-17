@@ -98,8 +98,11 @@ export class PathTool {
 	reset(): void {
 		const state = this.state;
 		if (state.mode === "drawing" && state.file) {
+			// Captured once, before any trash/recreate cycle, since trashing a file can itself
+			// move it (changing its .path) — recreation must always target this original spot.
+			const originalPath = state.file.path;
 			const path: PathData = {
-				notePath: state.file.path,
+				file: state.file,
 				name: state.file.basename,
 				type: state.type,
 				hexes: [...state.hexes],
@@ -107,16 +110,15 @@ export class PathTool {
 			this.pathsList.push(path);
 			this.undoManager.push({
 				undo: async () => {
-					const file = this.app.vault.getAbstractFileByPath(path.notePath);
-					if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+					await this.app.fileManager.trashFile(path.file);
 					this.pathsList = this.pathsList.filter((p) => p !== path);
 					this.render();
 					this.refreshDrawer();
 				},
 				redo: async () => {
 					if (!this.pathsFolder) return;
-					await this.app.vault.create(
-						path.notePath,
+					path.file = await this.app.vault.create(
+						originalPath,
 						this.buildPathFrontmatter(path.type, path.hexes),
 					);
 					this.pathsList.push(path);
@@ -151,9 +153,9 @@ export class PathTool {
 		if (
 			hitNotePath &&
 			(state.mode === "idle" ||
-				(state.mode === "editing" && hitNotePath !== state.path.notePath))
+				(state.mode === "editing" && hitNotePath !== state.path.file.path))
 		) {
-			const found = this.pathsList.find((p) => p.notePath === hitNotePath);
+			const found = this.pathsList.find((p) => p.file.path === hitNotePath);
 			if (found) {
 				this.state = {
 					mode: "editing",
@@ -358,14 +360,14 @@ export class PathTool {
 	}
 
 	private async deleteSelectedPath(path: PathData): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(path.notePath);
-		if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+		const originalPath = path.file.path;
+		await this.app.fileManager.trashFile(path.file);
 		this.pathsList = this.pathsList.filter((p) => p !== path);
 		this.undoManager.push({
 			undo: async () => {
 				if (!this.pathsFolder) return;
-				await this.app.vault.create(
-					path.notePath,
+				path.file = await this.app.vault.create(
+					originalPath,
 					this.buildPathFrontmatter(path.type, path.hexes),
 				);
 				this.pathsList.push(path);
@@ -373,8 +375,7 @@ export class PathTool {
 				this.refreshDrawer();
 			},
 			redo: async () => {
-				const file = this.app.vault.getAbstractFileByPath(path.notePath);
-				if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+				await this.app.fileManager.trashFile(path.file);
 				this.pathsList = this.pathsList.filter((p) => p !== path);
 				this.render();
 				this.refreshDrawer();
@@ -443,9 +444,13 @@ export class PathTool {
 	}
 
 	private async savePathHexes(path: PathData): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(path.notePath);
-		if (!(file instanceof TFile)) return;
-		await this.writePathHexes(file, path.hexes);
+		await this.writePathHexes(path.file, path.hexes);
+	}
+
+	/** Live TFile for the path whose note currently lives at `notePath` — used by the generic
+	 *  (no active tool) click-to-open handler. */
+	findFile(notePath: string): TFile | undefined {
+		return this.pathsList.find((p) => p.file.path === notePath)?.file;
 	}
 
 	private async writePathHexes(file: TFile, hexes: HexCoord[]): Promise<void> {

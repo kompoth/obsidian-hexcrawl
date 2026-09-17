@@ -8,6 +8,14 @@ const ICON_SCALE = 0.9;
 /** "mini" mode renders the icon at half the size used by "default" mode. */
 const MINI_SCALE = 0.5;
 
+/** Called when an icon is dropped onto another hex, to let the caller move hex-gm-icon there. */
+export type IconMoveHandler = (
+	fromQ: number,
+	fromR: number,
+	toQ: number,
+	toR: number,
+) => void;
+
 /**
  * hex-gm-icon — a GM-only icon layer, rendered above everything else (terrain, paths, icons).
  * Looks up icon names in the same icon set as the regular icon layer, but with no palette
@@ -19,10 +27,13 @@ export class GmIconsLayer {
 	private iconSrcs: Map<string, string> = new Map();
 	private gutter = 0;
 	private visible = true;
+	/** Whether Move mode is selected in the GM Icon tool's drawer — only then are icons draggable. */
+	private dragEnabled = false;
 
 	constructor(
 		private app: App,
 		private params: HexcrawlBlockParams,
+		private onMove: IconMoveHandler,
 	) {}
 
 	async load(): Promise<void> {
@@ -54,6 +65,16 @@ export class GmIconsLayer {
 		return this.visible;
 	}
 
+	/** Toggles whether icons can be dragged to another hex — called as Move mode is
+	 *  selected/deselected in the GM Icon tool's drawer. Every rendered GM icon is an explicit
+	 *  hex-gm-icon value (there's no palette fallback), so all of them are draggable while enabled. */
+	setDragEnabled(enabled: boolean): void {
+		if (this.dragEnabled === enabled) return;
+		this.dragEnabled = enabled;
+		for (const iconEl of this.iconElements.values())
+			iconEl.toggleClass("is-draggable", enabled);
+	}
+
 	render(hexNotes: Map<string, HexNoteData>, gutter: number): void {
 		const el = this.el;
 		if (!el) return;
@@ -73,6 +94,8 @@ export class GmIconsLayer {
 				this.placeIcon(
 					el,
 					key,
+					q,
+					r,
 					iconSrc,
 					iconName,
 					gutter + center.cx,
@@ -100,6 +123,8 @@ export class GmIconsLayer {
 			this.placeIcon(
 				el,
 				key,
+				q,
+				r,
 				iconSrc,
 				iconName,
 				this.gutter + center.cx,
@@ -143,6 +168,8 @@ export class GmIconsLayer {
 	private placeIcon(
 		container: HTMLElement,
 		key: string,
+		q: number,
+		r: number,
 		src: string,
 		alt: string,
 		cx: number,
@@ -163,8 +190,56 @@ export class GmIconsLayer {
 			iconEl.style.left = `${left}px`;
 			iconEl.style.top = `${top}px`;
 			this.iconElements.set(key, iconEl);
+			this.attachIconDrag(iconEl, q, r);
 		}
 		iconEl.src = src;
 		iconEl.alt = alt;
+		iconEl.toggleClass("is-draggable", this.dragEnabled);
+	}
+
+	/**
+	 * Drag-to-move an icon: dropping it onto another hex moves its hex-gm-icon value there and
+	 * clears it from this one. The element only receives pointer events at all while it has the
+	 * "is-draggable" class (see .hexcrawl-hex-icon's default pointer-events: none in
+	 * styles.css), so this handler is otherwise inert.
+	 */
+	private attachIconDrag(iconEl: HTMLImageElement, q: number, r: number): void {
+		iconEl.addEventListener("pointerdown", (e: PointerEvent) => {
+			if (e.button !== 0) return;
+			e.stopPropagation();
+			e.preventDefault();
+			iconEl.setPointerCapture(e.pointerId);
+			iconEl.addClass("is-dragging");
+			let hoverHex: HTMLElement | null = null;
+
+			const highlight = (ev: PointerEvent) => {
+				const hit = document.elementFromPoint(ev.clientX, ev.clientY);
+				const hexEl = hit?.closest(".hexcrawl-hex");
+				const next = hexEl instanceof HTMLElement ? hexEl : null;
+				if (next !== hoverHex) {
+					hoverHex?.removeClass("hexcrawl-hex-drop-target");
+					hoverHex = next;
+					hoverHex?.addClass("hexcrawl-hex-drop-target");
+				}
+				return hoverHex;
+			};
+
+			const onMove = (ev: PointerEvent) => highlight(ev);
+			const onUp = (ev: PointerEvent) => {
+				iconEl.removeEventListener("pointermove", onMove);
+				iconEl.removeEventListener("pointerup", onUp);
+				iconEl.removeClass("is-dragging");
+				const hexEl = highlight(ev);
+				hexEl?.removeClass("hexcrawl-hex-drop-target");
+				if (!hexEl) return;
+				const toQ = Number(hexEl.getAttribute("data-q"));
+				const toR = Number(hexEl.getAttribute("data-r"));
+				if (!Number.isInteger(toQ) || !Number.isInteger(toR)) return;
+				if (toQ === q && toR === r) return;
+				this.onMove(q, r, toQ, toR);
+			};
+			iconEl.addEventListener("pointermove", onMove);
+			iconEl.addEventListener("pointerup", onUp);
+		});
 	}
 }

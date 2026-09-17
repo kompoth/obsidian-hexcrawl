@@ -1,6 +1,11 @@
-# Obsidian Hexcrawl
+![Obsidian Hexcrawl](media/hexcrawl.svg)
+<div align="center" style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+	<a href="https://community.obsidian.md/plugins/hexcrawl"><img src="https://img.shields.io/github/release/kompoth/obsidian-hexcrawl?style=for-the-badge" style="height: 28px !important; display: inline-block;" alt="Release" /></a>
+	<a href="https://community.obsidian.md/plugins/hexcrawl" ><img src="https://img.shields.io/github/downloads/kompoth/obsidian-hexcrawl/total?style=for-the-badge" style="height: 28px !important; display: inline-block;"  alt="Downloads" /></a>
+	<a href="https://ko-fi.com/kmicic"><img src="https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white" style="height: 28px !important; display: inline-block;"  alt="Ko-fi" /></a>
+</div>
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/kmicic)
+<br/>
 
 Turn a folder of notes into a fully interactive, easily editable hex map. Drop a `hexcrawl` code block into any note, point it at a folder, and every note with `hex-q`/`hex-r` frontmatter becomes a hex on the map. The map itself isn't a static picture: paint terrain, drop icons, and draw paths straight onto it with the built-in toolbar.
 

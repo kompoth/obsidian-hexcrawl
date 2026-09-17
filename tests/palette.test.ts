@@ -5,7 +5,10 @@ import {
 	resolveNamedPalette,
 	resolvePaletteEntry,
 } from "../src/palette";
+import type { TFile } from "obsidian";
 import type { HexNoteData, Palette } from "../src/types";
+
+const fakeFile = { path: "p" } as TFile;
 
 describe("resolvePaletteEntry", () => {
 	const palette: Palette = {
@@ -14,7 +17,7 @@ describe("resolvePaletteEntry", () => {
 		borders: {},
 	};
 	const note = (terrain?: string): HexNoteData => ({
-		path: "p",
+		file: fakeFile,
 		name: "n",
 		terrain,
 	});
@@ -66,7 +69,7 @@ describe("resolveNamedPalette", () => {
 
 describe("resolveGmIconName", () => {
 	const note = (gmIcon?: string): HexNoteData => ({
-		path: "p",
+		file: fakeFile,
 		name: "n",
 		gmIcon,
 	});

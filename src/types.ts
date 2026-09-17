@@ -1,3 +1,5 @@
+import type { TFile } from "obsidian";
+
 export type HexOrientation = "pointy" | "flat";
 
 /** Which parity of row (pointy-top) or column (flat-top) is the shifted one. */
@@ -67,7 +69,9 @@ export interface HexcrawlBlockParams {
 }
 
 export interface HexNoteData {
-	path: string;
+	/** The note's own TFile — Obsidian mutates this in place on rename/move, so operations
+	 *  against it stay correct without needing to re-resolve a cached path string. */
+	file: TFile;
 	name: string;
 	terrain?: string;
 	/** hex-icon frontmatter value; overrides whatever icon the palette would pick for hex-terrain. */
@@ -82,8 +86,9 @@ export interface HexCoord {
 }
 
 export interface PathData {
-	/** Vault path of the note this path came from, so clicking it can open that note. */
-	notePath: string;
+	/** The note this path came from, so clicking it can open that note — a live TFile rather
+	 *  than a path string, so it stays valid across an external rename/move. */
+	file: TFile;
 	name: string;
 	/** path-type frontmatter value, e.g. "road" | "river" | "barrier". Looked up in palette.paths; also used as a CSS class modifier and, if unmatched, as a literal CSS color (same fallback as hex-terrain). */
 	type?: string;
@@ -94,8 +99,9 @@ export interface PathData {
 }
 
 export interface BorderData {
-	/** Vault path of the note this border came from, so clicking it can open that note. */
-	notePath: string;
+	/** The note this border came from, so clicking it can open that note — a live TFile rather
+	 *  than a path string, so it stays valid across an external rename/move. */
+	file: TFile;
 	name: string;
 	/** border-type frontmatter value; looked up in palette.borders the same way path-type is. */
 	type?: string;

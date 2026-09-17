@@ -82,6 +82,21 @@
 	-webkit-user-drag: none;
 }
 
+/* Only set while Move mode is selected in the Icon/GM Icon tool's drawer — re-enables pointer
+   events on this one icon so it can be picked up and dropped onto another hex. !important
+   because some themes/plugins set an inline zoom cursor on every <img>, which would otherwise
+   outrank a plain (non-important) rule regardless of selector specificity. */
+.hexcrawl-hex-icon.is-draggable {
+	pointer-events: auto;
+	cursor: grab !important;
+}
+
+/* Set only while the pointer is actually down and dragging — specificity plus source order
+   ensures this wins over .is-draggable's cursor while both classes are present. */
+.hexcrawl-hex-icon.is-draggable.is-dragging {
+	cursor: grabbing !important;
+}
+
 .hexcrawl-paths {
 	position: absolute;
 	top: 0;
