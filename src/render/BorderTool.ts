@@ -121,9 +121,9 @@ export class BorderTool {
 		if (
 			hitNotePath &&
 			(state.mode === "idle" ||
-				(state.mode === "editing" && hitNotePath !== state.border.notePath))
+				(state.mode === "editing" && hitNotePath !== state.border.file.path))
 		) {
-			const found = this.bordersList.find((b) => b.notePath === hitNotePath);
+			const found = this.bordersList.find((b) => b.file.path === hitNotePath);
 			if (found) {
 				this.state = { mode: "editing", border: found, confirmDelete: false };
 				this.render();
@@ -316,7 +316,7 @@ export class BorderTool {
 			this.buildBorderFrontmatter(type, [pair]),
 		);
 		const border: BorderData = {
-			notePath: file.path,
+			file,
 			name: file.basename,
 			type,
 			pairs: [pair],
@@ -324,16 +324,15 @@ export class BorderTool {
 		this.bordersList.push(border);
 		this.undoManager.push({
 			undo: async () => {
-				const f = this.app.vault.getAbstractFileByPath(border.notePath);
-				if (f instanceof TFile) await this.app.fileManager.trashFile(f);
+				await this.app.fileManager.trashFile(border.file);
 				this.bordersList = this.bordersList.filter((b) => b !== border);
 				this.render();
 				this.refreshDrawer();
 			},
 			redo: async () => {
 				if (!this.bordersFolder) return;
-				await this.app.vault.create(
-					border.notePath,
+				border.file = await this.app.vault.create(
+					path,
 					this.buildBorderFrontmatter(border.type, border.pairs),
 				);
 				this.bordersList.push(border);
@@ -347,14 +346,14 @@ export class BorderTool {
 	}
 
 	private async deleteBorder(border: BorderData): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(border.notePath);
-		if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+		const originalPath = border.file.path;
+		await this.app.fileManager.trashFile(border.file);
 		this.bordersList = this.bordersList.filter((b) => b !== border);
 		this.undoManager.push({
 			undo: async () => {
 				if (!this.bordersFolder) return;
-				await this.app.vault.create(
-					border.notePath,
+				border.file = await this.app.vault.create(
+					originalPath,
 					this.buildBorderFrontmatter(border.type, border.pairs),
 				);
 				this.bordersList.push(border);
@@ -362,8 +361,7 @@ export class BorderTool {
 				this.refreshDrawer();
 			},
 			redo: async () => {
-				const f = this.app.vault.getAbstractFileByPath(border.notePath);
-				if (f instanceof TFile) await this.app.fileManager.trashFile(f);
+				await this.app.fileManager.trashFile(border.file);
 				this.bordersList = this.bordersList.filter((b) => b !== border);
 				this.render();
 				this.refreshDrawer();
@@ -437,9 +435,13 @@ export class BorderTool {
 	}
 
 	private async saveBorderPairs(border: BorderData): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(border.notePath);
-		if (!(file instanceof TFile)) return;
-		await this.writeBorderPairs(file, border.pairs);
+		await this.writeBorderPairs(border.file, border.pairs);
+	}
+
+	/** Live TFile for the border whose note currently lives at `notePath` — used by the generic
+	 *  (no active tool) click-to-open handler. */
+	findFile(notePath: string): TFile | undefined {
+		return this.bordersList.find((b) => b.file.path === notePath)?.file;
 	}
 
 	private async writeBorderPairs(

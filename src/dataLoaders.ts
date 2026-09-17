@@ -36,7 +36,7 @@ export function loadHexNotes(
 		const parsed = parseHexNoteFrontmatter(frontmatter);
 		if (!parsed) continue;
 		notes.set(hexKey(parsed.q, parsed.r), {
-			path: child.path,
+			file: child,
 			name: child.basename,
 			terrain: parsed.terrain,
 			icon: parsed.icon,
@@ -54,7 +54,7 @@ export function loadPaths(app: App, folder: TFolder): PathData[] {
 		if (!frontmatter) continue;
 		const parsed = parsePathFrontmatter(frontmatter);
 		if (!parsed) continue;
-		paths.push({ notePath: child.path, name: child.basename, ...parsed });
+		paths.push({ file: child, name: child.basename, ...parsed });
 	}
 	return paths;
 }
@@ -96,7 +96,7 @@ export function loadBorders(
 			continue;
 		}
 		borders.push({
-			notePath: child.path,
+			file: child,
 			name: child.basename,
 			type: parsed.type,
 			pairs: parsed.pairs,

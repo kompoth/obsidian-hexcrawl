@@ -3,7 +3,6 @@ import {
 	MarkdownPostProcessorContext,
 	normalizePath,
 	Platform,
-	TFile,
 	TFolder,
 } from "obsidian";
 import type { HexCoord, HexcrawlBlockParams, HexNoteData } from "../types";
@@ -358,12 +357,29 @@ export class HexMapRenderer {
 		}
 
 		const el = hit.closest("[data-note-path]");
-		const notePath = el?.getAttribute("data-note-path");
-		if (!notePath) return;
-		const file = this.app.vault.getAbstractFileByPath(notePath);
-		if (file instanceof TFile) {
-			void this.app.workspace.getLeaf(true).openFile(file);
+		if (!el) return;
+
+		// A hex cell carries the attribute directly, and its own hexNotes entry always holds a
+		// live TFile — resolving through the grid coordinates rather than the (possibly stale,
+		// if the note was renamed since the last render) path string on the element itself.
+		const hexEl = el.closest(".hexcrawl-hex");
+		if (hexEl instanceof HTMLElement) {
+			const q = Number(hexEl.getAttribute("data-q"));
+			const r = Number(hexEl.getAttribute("data-r"));
+			const note =
+				Number.isInteger(q) && Number.isInteger(r)
+					? this.hexNotes.get(hexKey(q, r))
+					: undefined;
+			if (note) void this.app.workspace.getLeaf(true).openFile(note.file);
+			return;
 		}
+
+		// Otherwise it's a path/border line — look up its live TFile via the owning tool's list.
+		const notePath = el.getAttribute("data-note-path");
+		const file = notePath
+			? (this.pathTool.findFile(notePath) ?? this.borderTool.findFile(notePath))
+			: undefined;
+		if (file) void this.app.workspace.getLeaf(true).openFile(file);
 	}
 
 	/**
@@ -586,10 +602,8 @@ export class HexMapRenderer {
 		});
 
 		if (existing) {
-			const file = this.app.vault.getAbstractFileByPath(existing.path);
-			if (!(file instanceof TFile)) return;
 			await this.app.fileManager.processFrontMatter(
-				file,
+				existing.file,
 				(fm: Record<string, unknown>) => {
 					if (value === undefined) delete fm[field];
 					else fm[field] = value;
@@ -611,7 +625,7 @@ export class HexMapRenderer {
 			const content = `---\nhex-q: ${q}\nhex-r: ${r}\n${field}: ${JSON.stringify(value)}\n---\n`;
 			const file = await this.app.vault.create(path, content);
 			const created: HexNoteData = {
-				path: file.path,
+				file,
 				name: file.basename,
 				...patch({}),
 			};
@@ -647,8 +661,7 @@ export class HexMapRenderer {
 			return;
 		}
 
-		const file = this.app.vault.getAbstractFileByPath(existing.path);
-		if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+		await this.app.fileManager.trashFile(existing.file);
 		this.hexNotes.delete(key);
 		this.terrainLayer.updateHex(m.q, m.r, undefined);
 		this.iconsLayer.updateHex(m.q, m.r, undefined);

@@ -91,7 +91,7 @@ export class PathLayer {
 				cls: path.type
 					? ["hexcrawl-path", `hexcrawl-path-${path.type}`]
 					: "hexcrawl-path",
-				attr: { d, fill: "none", "data-note-path": path.notePath },
+				attr: { d, fill: "none", "data-note-path": path.file.path },
 			});
 			const color = style?.color ?? path.type;
 			if (color) pathEl.style.stroke = color;
@@ -104,7 +104,7 @@ export class PathLayer {
 			// Wider, invisible sibling so a thin/dashed line is still easy to click/select.
 			const hitEl = svg.createSvg("path", {
 				cls: "hexcrawl-path-hitarea",
-				attr: { d, fill: "none", "data-note-path": path.notePath },
+				attr: { d, fill: "none", "data-note-path": path.file.path },
 			});
 			hitEl.style.strokeWidth = String(Math.max(width, MIN_HITAREA_WIDTH));
 		}

@@ -42,7 +42,7 @@ export class TerrainLayer {
 					attr: {
 						"data-q": String(q),
 						"data-r": String(r),
-						...(note ? { "data-note-path": note.path } : {}),
+						...(note ? { "data-note-path": note.file.path } : {}),
 					},
 				});
 				hexEl.style.width = `${hexW}px`;
@@ -76,7 +76,7 @@ export class TerrainLayer {
 		if (this.visible) hexEl.style.backgroundColor = color;
 
 		if (note) {
-			hexEl.setAttr("data-note-path", note.path);
+			hexEl.setAttr("data-note-path", note.file.path);
 			hexEl.addClass("hexcrawl-hex-configured");
 			if (!note.name.startsWith("_")) setTooltip(hexEl, note.name);
 		} else {
