@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-hexcrawl",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"description": "A simplified hexcrawl map plugin for Obsidian.",
 	"main": "main.js",
 	"scripts": {

@@ -1,7 +1,7 @@
 {
 	"id": "hexcrawl",
 	"name": "Hexcrawl",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"minAppVersion": "1.13.0",
 	"description": "Render zoomable, pannable hexcrawl maps from a folder of hex notes via a `hexcrawl` code block.",
 	"author": "Vasilii Negrebetskii",
